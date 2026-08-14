@@ -21,19 +21,28 @@ export interface ConfigView {
 const FORCED_HINT =
   "Esta tela ainda não sabe a qual servidor e loja pertence. Informe o endereço do servidor e o número da loja.";
 const OPTIONAL_HINT =
-  "Alterar estes dados reconecta a tela e carrega a campanha da nova loja.";
+  "Alterar estes dados reconecta a tela e carrega a campanha da nova loja!.";
 
 export class SetupScreen {
   private readonly root = document.querySelector<HTMLDivElement>("#setup")!;
-  private readonly form = document.querySelector<HTMLFormElement>("#setup-form")!;
-  private readonly hint = document.querySelector<HTMLParagraphElement>("#setup-hint")!;
-  private readonly server = document.querySelector<HTMLInputElement>("#setup-server")!;
-  private readonly store = document.querySelector<HTMLInputElement>("#setup-store")!;
-  private readonly name = document.querySelector<HTMLInputElement>("#setup-name")!;
-  private readonly error = document.querySelector<HTMLParagraphElement>("#setup-error")!;
-  private readonly cancel = document.querySelector<HTMLButtonElement>("#setup-cancel")!;
-  private readonly save = document.querySelector<HTMLButtonElement>("#setup-save")!;
-  private readonly deviceId = document.querySelector<HTMLSpanElement>("#setup-device-id")!;
+  private readonly form =
+    document.querySelector<HTMLFormElement>("#setup-form")!;
+  private readonly hint =
+    document.querySelector<HTMLParagraphElement>("#setup-hint")!;
+  private readonly server =
+    document.querySelector<HTMLInputElement>("#setup-server")!;
+  private readonly store =
+    document.querySelector<HTMLInputElement>("#setup-store")!;
+  private readonly name =
+    document.querySelector<HTMLInputElement>("#setup-name")!;
+  private readonly error =
+    document.querySelector<HTMLParagraphElement>("#setup-error")!;
+  private readonly cancel =
+    document.querySelector<HTMLButtonElement>("#setup-cancel")!;
+  private readonly save =
+    document.querySelector<HTMLButtonElement>("#setup-save")!;
+  private readonly deviceId =
+    document.querySelector<HTMLSpanElement>("#setup-device-id")!;
 
   /** False when the screen has nothing to fall back to, so there is nothing to cancel to. */
   private cancellable = false;
@@ -75,7 +84,9 @@ export class SetupScreen {
 
     // Land on the first thing that still needs typing, so an operator with only a
     // keyboard can fill this in without hunting.
-    const firstEmpty = [this.server, this.store, this.name].find((f) => f.value === "");
+    const firstEmpty = [this.server, this.store, this.name].find(
+      (f) => f.value === "",
+    );
     (firstEmpty ?? this.server).focus();
   }
 
