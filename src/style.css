@@ -1,0 +1,78 @@
+/* A store screen has no pointer and no reader. Everything here exists to make sure the
+   only thing ever visible is the video, on black. */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  cursor: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#video,
+#freeze {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  /* Letterbox. Marketing content is composed to the frame; cropping it is worse than
+     bars. This is resize_mode="fit" on the Android side. */
+  object-fit: contain;
+}
+
+#freeze {
+  z-index: 1;
+}
+
+#video {
+  z-index: 2;
+}
+
+#video.hidden {
+  visibility: hidden;
+}
+
+/* Shown only when there is genuinely nothing to play. Deliberately plain — nobody is
+   meant to read this for long. */
+#notice {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: #000;
+  text-align: center;
+  padding: 2rem;
+}
+
+#notice[hidden] {
+  display: none;
+}
+
+#notice .title {
+  font-size: 2.2rem;
+  font-weight: 600;
+  color: #4fc3f7;
+}
+
+#notice .detail {
+  font-size: 1.1rem;
+  color: #9aa4ad;
+  max-width: 40rem;
+  line-height: 1.5;
+}

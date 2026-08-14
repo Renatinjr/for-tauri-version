@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Katuxa Signage</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- The canvas sits under the video and holds the last frame across a rebuild, so a
+         glitch does not flash black. It is the equivalent of ExoPlayer's
+         keep_content_on_player_reset. -->
+    <canvas id="freeze"></canvas>
+    <video id="video" playsinline></video>
+    <div id="notice" hidden></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
