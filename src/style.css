@@ -155,6 +155,32 @@ body.setup-open {
   color: #5a636b;
 }
 
+#setup .checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+  color: #c8d0d7;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+#setup .checkbox input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.15rem;
+  accent-color: #4fc3f7;
+  flex: none;
+  padding: 0;
+}
+
+#setup .checkbox small {
+  display: block;
+  color: #626b73;
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+}
+
 #setup .error {
   margin-top: 1rem;
   padding: 0.7rem 0.9rem;
@@ -190,6 +216,20 @@ body.setup-open {
   background: transparent;
   color: #9aa4ad;
   border: 1px solid #2b343d;
+}
+
+#setup button.quiet {
+  margin-left: auto;
+  background: transparent;
+  color: #7a848c;
+  border: 1px solid transparent;
+  font-weight: 400;
+}
+
+#setup button.quiet:hover,
+#setup button.quiet:focus {
+  color: #ff9a9a;
+  border-color: #3a1d1d;
 }
 
 #setup button[hidden] {

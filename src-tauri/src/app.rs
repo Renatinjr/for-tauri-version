@@ -39,6 +39,7 @@ pub struct ConfigView {
     pub device_name: Option<String>,
     pub store_id: Option<String>,
     pub server: Option<String>,
+    pub kiosk: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -47,8 +48,23 @@ pub struct Bootstrap {
     pub media: Option<MediaRef>,
     pub notice: Option<Notice>,
     pub config: ConfigView,
+    /// No server *and* nothing to play: the setup screen cannot be dismissed, because
+    /// there is nothing behind it.
     pub needs_provisioning: bool,
+    /// How long the setup screen waits before continuing on its own, or `None` when it
+    /// should wait indefinitely.
+    ///
+    /// The setup screen opens on every launch so the settings are in front of whoever is
+    /// standing there. That is fine at a desk and fatal in a shop: fifteen screens that
+    /// come back from a power cut and then sit on a form are fifteen screens showing
+    /// nothing until somebody drives out. So when there is something to fall back to, it
+    /// counts down and continues by itself. Any key or click stops the countdown.
+    pub auto_continue_ms: Option<u32>,
 }
+
+/// Long enough to read the form and reach for the keyboard, short enough that a screen
+/// recovering at 04:00 is playing again before anybody notices it was not.
+const AUTO_CONTINUE_MS: u32 = 10_000;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -108,6 +124,7 @@ impl AppState {
             device_name: config.device_name,
             store_id: config.store_id,
             server: config.server,
+            kiosk: config.kiosk,
         }
     }
 
@@ -171,6 +188,7 @@ pub fn apply_cli_provisioning(app: &AppHandle, provisioning: &Provisioning) {
         provisioning.server.as_deref(),
         provisioning.name.as_deref(),
         provisioning.store.as_deref(),
+        provisioning.kiosk,
     ) {
         Ok(false) => linfo!("Command-line provisioning matched what was already stored"),
         Ok(true) => {
@@ -233,6 +251,12 @@ pub fn bootstrap(state: State<'_, AppState>) -> Bootstrap {
         notice,
         config: state.config_view(),
         needs_provisioning,
+        auto_continue_ms: if needs_provisioning {
+            // Nothing to continue *to*.
+            None
+        } else {
+            Some(AUTO_CONTINUE_MS)
+        },
     }
 }
 
@@ -262,6 +286,7 @@ pub fn save_provisioning(
     server: String,
     store_id: String,
     device_name: String,
+    kiosk: bool,
 ) -> Result<ConfigView, String> {
     let server = server.trim();
     let store_id = store_id.trim();
@@ -279,6 +304,7 @@ pub fn save_provisioning(
                 Some(device_name)
             },
             Some(store_id),
+            Some(kiosk),
         )
         .map_err(|err| format!("Não foi possível salvar: {err}"))?;
 

@@ -53,18 +53,26 @@ webview side of the story.
 A screen needs three things: a server address, a store number, and optionally a name. There
 are two ways to give it them, and they write the same `config.json`.
 
-**The setup screen.** It opens by itself when a screen has neither a server nor anything to
-play. On a screen that is already running, Ctrl+Shift+S opens it deliberately — that is how
-you move a screen to another store without wiping it. Esc closes it again.
+**The setup screen**, which opens on **every launch**, prefilled from the last session, so
+whoever is standing at the machine can see and change where it points without knowing a
+shortcut. Ctrl+Shift+S opens it again later; Esc continues past it.
 
-The prompt is *derived* from "no server and nothing to play", recomputed whenever either
-changes. It is never latched: the Android player used to set it once at boot, which threw
-the setup form over a playing video on every activity recreation. Do not reintroduce that.
+That would be fatal on its own — fifteen screens that come back from a power cut and then
+sit on a form are fifteen screens showing nothing until somebody drives out. So when there
+is something to fall back to, the form counts down and **continues by itself after ten
+seconds**. Any key or click stops the countdown, because somebody is evidently there. A
+screen with no server *and* nothing to play has nowhere to continue to, so that one waits
+indefinitely — that case is still derived from state, recomputed whenever either changes,
+never latched. (The Android player latched it once at boot and threw the setup form over a
+playing video on every activity recreation. Do not reintroduce that.)
+
+The form also carries the **kiosk** switch and the only visible way to quit — the window is
+borderless, so it has no close button of its own.
 
 **The command line**, which is the equivalent of `adb shell am start -S --es …`:
 
 ```bash
-signage-desktop.exe --server 192.168.1.10:8080 --store 710 --name pc-entrada-01
+signage-desktop.exe --server 192.168.1.10:8080 --store 710 --name pc-entrada-01 --kiosk
 ```
 
 Run against a screen that is already running, this re-provisions it in place:
@@ -72,6 +80,9 @@ Run against a screen that is already running, this re-provisions it in place:
 process exits without opening a window. Omitted flags mean *leave alone*, so
 `--store 704` on its own moves the store and keeps the server and name — the same
 convention as `Prefs.setProvisioning`.
+
+`--kiosk` / `--no-kiosk` is the same switch as the checkbox on the form, so a machine can be
+locked down on its way into a shop without anybody hunting for it.
 
 The two paths differ in one way, on purpose: the form requires a server and a store,
 because a screen without a store can only ever be addressed individually and that defeats
@@ -141,7 +152,7 @@ across rather than reinvented.
 | `data/Prefs.kt` | `src-tauri/src/config.rs` |
 | `setup/SetupActivity.kt` | `src/setup.ts` + `src-tauri/src/cli.rs` |
 | `PlayerService.kt` | `src-tauri/src/app.rs` (+ `socket.rs`, `download.rs` in Phase C) |
-| lock task mode / device owner | fullscreen always-on-top window, close refused |
+| lock task mode / device owner | fullscreen always-on-top window; close refused **only when kiosk mode is on**, which is off by default |
 | HOME intent filter | `tauri-plugin-autostart` |
 | `FLAG_KEEP_SCREEN_ON` | `SetThreadExecutionState`, `src-tauri/src/kiosk.rs` |
 | `adb shell am start -S --es …` | a second launch, forwarded by `tauri-plugin-single-instance` |
@@ -179,6 +190,9 @@ On macOS, against a real 10-second campaign video:
   provisioned screen with a video on disk never opens the form at all.
 - `config.json` survives a restart, keeps its device id, and is replaced rather than fatal
   when corrupt.
+- The setup screen opens on every launch, prefilled, counts down, and continues on its own
+  after ten seconds into playback.
+- `--kiosk` and `--no-kiosk` toggle the lock on a running screen and the choice persists.
 
 ## Not verified
 
@@ -198,7 +212,12 @@ branch of `kiosk.rs` compiles at all:
 Also untested anywhere: a 12-hour soak, and whether the seam at the loop point is visible
 on a real screen. The Android player has the same open question.
 
-One thing verified only by behaviour, not by eye: the setup screen's **appearance**. This
-machine will not grant the shell screen-recording permission, so its layout, contrast and
-focus order have not been looked at — only that it opens, closes, validates and saves when
-it should. Worth a glance the first time you run it.
+Two things verified only by reading, not by running. This machine grants the shell neither
+screen-recording nor accessibility permission, so the UI cannot be seen or clicked from a
+test:
+
+- The setup screen's **appearance** — layout, contrast, focus order. Only its behaviour has
+  been exercised: that it opens, counts down, validates, saves and closes when it should.
+- **Closing.** That the window honours a close request with kiosk off, refuses it with
+  kiosk on, and that the "Sair" button quits. The flag itself is unit-tested and the branch
+  is eight lines, but nothing has actually pressed the button.

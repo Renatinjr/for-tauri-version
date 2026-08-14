@@ -48,11 +48,21 @@
           spellcheck="false"
         />
 
+        <label class="checkbox" for="setup-kiosk">
+          <input id="setup-kiosk" type="checkbox" />
+          <span>
+            Modo quiosque
+            <small>Impede que a tela seja fechada. Ctrl+Shift+Q ainda encerra.</small>
+          </span>
+        </label>
+
         <p class="error" id="setup-error" hidden></p>
 
         <div class="actions">
-          <button type="submit" id="setup-save">Salvar</button>
-          <button type="button" id="setup-cancel" hidden>Cancelar</button>
+          <button type="submit" id="setup-save">Salvar e continuar</button>
+          <button type="button" id="setup-cancel" hidden>Continuar</button>
+          <!-- The window is borderless, so there is no close button anywhere else. -->
+          <button type="button" id="setup-quit" class="quiet">Sair</button>
         </div>
 
         <p class="device-id">ID do dispositivo: <span id="setup-device-id"></span></p>

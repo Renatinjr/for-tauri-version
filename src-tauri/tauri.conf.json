@@ -22,7 +22,7 @@
         "resizable": false,
         "maximizable": false,
         "minimizable": false,
-        "closable": false,
+        "closable": true,
         "skipTaskbar": true,
         "focus": true,
         "backgroundColor": "#000000"

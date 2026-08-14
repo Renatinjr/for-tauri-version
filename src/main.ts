@@ -26,6 +26,7 @@ interface Bootstrap {
   notice: Notice | null;
   config: ConfigView;
   needsProvisioning: boolean;
+  autoContinueMs: number | null;
 }
 
 interface ConfigChanged {
@@ -46,20 +47,21 @@ function log(level: LogLevel, message: string): void {
 
 const player = new Player(video, freeze, log);
 
-/** Kept current so Ctrl+Shift+S can open the setup screen prefilled. */
-let config: ConfigView = {
-  deviceId: "",
-  deviceName: null,
-  storeId: null,
-  server: null,
-};
+/** Whether anything has been handed to the player yet this session. */
+let started = false;
 
-const setup = new SetupScreen(log, (saved) => {
-  config = saved;
-  log("i", `Provisioned: store ${saved.storeId ?? "none"} at ${saved.server ?? "none"}`);
-  // Phase C reconnects the control socket here. Until then, saving is all there is to do.
-  void refresh();
-});
+const setup = new SetupScreen(
+  log,
+  (saved) => {
+    log("i", `Provisioned: store ${saved.storeId ?? "none"} at ${saved.server ?? "none"}`);
+    // Phase C reconnects the control socket here. Until then, saving is all there is to do.
+    void proceed();
+  },
+  () => {
+    // Continued past the form. If a video is already on screen behind it, leave it alone.
+    if (!started) void proceed();
+  },
+);
 
 function showNotice(n: Notice | null): void {
   if (!n) {
@@ -79,6 +81,7 @@ function showNotice(n: Notice | null): void {
 
 function play(media: MediaRef): void {
   showNotice(null);
+  started = true;
   player.start(media.url);
   // Tell Rust the webview now owns this file. Only after this does it dare delete the
   // one before it — on Windows a delete of an open file simply fails.
@@ -87,14 +90,13 @@ function play(media: MediaRef): void {
   });
 }
 
-/** Re-reads the whole state from Rust and shows whatever it says to show. */
-async function refresh(): Promise<void> {
+/** Past the setup screen: play what there is, or say why there is nothing. */
+async function proceed(): Promise<void> {
   const state = await invoke<Bootstrap>("bootstrap");
-  config = state.config;
 
   if (state.needsProvisioning) {
-    log("i", "Unprovisioned and nothing to play — opening setup");
-    setup.show(state.config, false);
+    log("i", "Still unprovisioned and nothing to play — back to setup");
+    setup.show(state.config, { cancellable: false });
     showNotice(null);
     return;
   }
@@ -108,17 +110,29 @@ async function refresh(): Promise<void> {
   }
 }
 
+/** Opens the setup screen deliberately, prefilled with whatever is stored. */
+async function openSetup(): Promise<void> {
+  const state = await invoke<Bootstrap>("bootstrap");
+  setup.show(state.config, {
+    cancellable: !state.needsProvisioning,
+    // No countdown when a human asked for the form — they are already standing there.
+    autoContinueMs: null,
+  });
+}
+
 async function main(): Promise<void> {
   await listen<MediaRef>("play", (event) => {
     log("i", `Now playing ${event.payload.videoId}`);
-    setup.hide();
+    // Start it behind the form rather than yanking the form out from under somebody
+    // mid-sentence. The exception is a form that was forced open for want of anything to
+    // play — that reason has just gone away.
+    if (setup.forced) setup.hide();
     play(event.payload);
   });
 
   await listen<Notice | null>("notice", (event) => showNotice(event.payload));
 
   await listen<ConfigChanged>("config-changed", (event) => {
-    config = event.payload.config;
     setup.refresh(event.payload.config, event.payload.needsProvisioning);
   });
 
@@ -132,10 +146,24 @@ async function main(): Promise<void> {
   await listen<null>("reload", () => {
     log("i", "Reload requested");
     player.stop();
-    void refresh().catch((err: unknown) => log("e", `Reload failed: ${String(err)}`));
+    void proceed().catch((err: unknown) => log("e", `Reload failed: ${String(err)}`));
   });
 
-  await refresh();
+  // The setup screen opens on every launch, prefilled from the last session, so whoever
+  // is standing at the machine can see and change where it points without knowing a
+  // shortcut. When there is something to fall back to it continues on its own after a few
+  // seconds — a screen recovering from a power cut cannot wait for a human.
+  const state = await invoke<Bootstrap>("bootstrap");
+  log(
+    "i",
+    state.needsProvisioning
+      ? "Unprovisioned and nothing to play — setup, and it will wait"
+      : `Setup on launch; continuing on its own in ${(state.autoContinueMs ?? 0) / 1000}s`,
+  );
+  setup.show(state.config, {
+    cancellable: !state.needsProvisioning,
+    autoContinueMs: state.autoContinueMs,
+  });
 
   // The heartbeat needs a position, and the Android player sampled at the same cadence.
   window.setInterval(() => {
@@ -184,7 +212,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     if (!setup.visible) {
       log("i", "Setup opened from the keyboard");
-      setup.show(config, true);
+      void openSetup();
     }
     return;
   }

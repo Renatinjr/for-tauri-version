@@ -18,11 +18,14 @@ pub struct Provisioning {
     pub server: Option<String>,
     pub store: Option<String>,
     pub name: Option<String>,
+    /// `--kiosk` / `--no-kiosk`. This is how a machine gets locked down on its way into a
+    /// shop, without anybody having to find the checkbox.
+    pub kiosk: Option<bool>,
 }
 
 impl Provisioning {
     pub fn is_empty(&self) -> bool {
-        self.server.is_none() && self.store.is_none() && self.name.is_none()
+        self.server.is_none() && self.store.is_none() && self.name.is_none() && self.kiosk.is_none()
     }
 }
 
@@ -46,6 +49,14 @@ where
             "--server" => &mut out.server,
             "--store" => &mut out.store,
             "--name" => &mut out.name,
+            "--kiosk" => {
+                out.kiosk = Some(true);
+                continue;
+            }
+            "--no-kiosk" => {
+                out.kiosk = Some(false);
+                continue;
+            }
             _ => continue,
         };
 
@@ -90,8 +101,24 @@ mod tests {
                 server: Some("192.168.1.10:8080".into()),
                 store: Some("710".into()),
                 name: Some("tv-entrada-01".into()),
+                kiosk: None,
             }
         );
+    }
+
+    #[test]
+    fn kiosk_is_a_switch_with_both_directions() {
+        assert_eq!(parse(["x", "--kiosk"]).kiosk, Some(true));
+        assert_eq!(parse(["x", "--no-kiosk"]).kiosk, Some(false));
+        // Unmentioned means leave alone, like every other field here.
+        assert_eq!(parse(["x", "--store", "710"]).kiosk, None);
+    }
+
+    #[test]
+    fn kiosk_does_not_swallow_the_argument_after_it() {
+        let parsed = parse(["x", "--kiosk", "--store", "710"]);
+        assert_eq!(parsed.kiosk, Some(true));
+        assert_eq!(parsed.store.as_deref(), Some("710"));
     }
 
     #[test]

@@ -49,16 +49,25 @@ pub fn run() {
             app::ui_log,
             app::request_quit,
         ])
-        .on_window_event(|_window, event| {
+        .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                if std::env::var_os("SIGNAGE_WINDOWED").is_some() {
-                    return;
+                // Closing is allowed by default. Refusing it only makes sense on a screen
+                // hanging in a shop, and there it is a setting rather than a law of the
+                // program — an app you cannot close is an app you cannot work on.
+                //
+                // Deliberately not exempting SIGNAGE_WINDOWED: dev is closable because
+                // kiosk defaults off, and an exemption would make the one branch that
+                // matters impossible to try out before it reaches a shop.
+                let kiosk = window
+                    .app_handle()
+                    .try_state::<AppState>()
+                    .is_some_and(|state| state.config.snapshot().kiosk);
+                if kiosk {
+                    api.prevent_close();
+                    lwarn!("Close refused: kiosk mode is on (Ctrl+Shift+Q still exits)");
+                } else {
+                    linfo!("Closing");
                 }
-                // Alt+F4 and the window chrome must not be able to end a campaign. The
-                // deliberate way out is the Ctrl+Shift+Q chord, which calls `exit`
-                // directly and so is not caught here.
-                api.prevent_close();
-                lwarn!("Close request refused — use Ctrl+Shift+Q to exit");
             }
         })
         .setup(|tauri_app| {
