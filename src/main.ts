@@ -79,6 +79,20 @@ function showNotice(n: Notice | null): void {
   notice.hidden = false;
 }
 
+const identify = document.querySelector<HTMLDivElement>("#identify")!;
+let identifyTimer: number | null = null;
+
+/** Ten seconds of the screen's name, so somebody in the shop can tell which one it is. */
+function showIdentity(name: string): void {
+  identify.textContent = name;
+  identify.hidden = false;
+  if (identifyTimer !== null) window.clearTimeout(identifyTimer);
+  identifyTimer = window.setTimeout(() => {
+    identify.hidden = true;
+    identifyTimer = null;
+  }, 10_000);
+}
+
 function play(media: MediaRef): void {
   showNotice(null);
   started = true;
@@ -131,6 +145,11 @@ async function main(): Promise<void> {
   });
 
   await listen<Notice | null>("notice", (event) => showNotice(event.payload));
+
+  await listen<string>("identify", (event) => {
+    log("i", `Identifying as ${event.payload}`);
+    showIdentity(event.payload);
+  });
 
   await listen<ConfigChanged>("config-changed", (event) => {
     setup.refresh(event.payload.config, event.payload.needsProvisioning);

@@ -10,19 +10,20 @@ channel; the webview owns the `<video>` element and nothing else.
 
 ## Status
 
-**Phases A and B of four are done.** What exists today: the kiosk shell, the local media
-store, the loopback media server, looping playback with a watchdog, persistent config, and
-provisioning — both a setup screen and the command line. It plays whatever `.mp4` is in its
-media directory, forever, and knows which server and store it belongs to.
+**Phases A, B and C of four are done.** A screen now connects to the management server,
+announces itself, takes its store's campaign, downloads and verifies it, and plays it on
+loop — and answers `reload`, `identify`, `getLogs`, `configure` and `reboot` from the
+dashboard.
 
-It does not talk to the server yet. That is Phase C.
+What is left is Phase D: clock sync and group drift correction, so several screens can hold
+a video wall in step, plus the nightly restart.
 
 | Phase | Contents | State |
 |---|---|---|
 | A | kiosk shell, media store, loopback media server, looping playback + watchdog | **done** |
 | B | `config.json`, setup screen, CLI provisioning | **done** |
-| C | control channel, `assign`, resumable download + SHA-256, remote commands | not started |
-| D | time sync, group drift correction, nightly restart, Windows CI | not started |
+| C | control channel, `assign`, resumable download + SHA-256, remote commands | **done** |
+| D | time sync, group drift correction, nightly restart | not started |
 
 ## Running it during development
 
@@ -93,6 +94,43 @@ The device id is minted once, on first run, as `pc-` plus ten hex characters —
 than the Android player's `tv-` so the two are distinguishable in the dashboard with no
 server change. It must stay stable: the server terminates any older socket claiming the
 same id, so two screens sharing one would kill each other in a reconnect loop.
+
+## The control channel
+
+One supervisor task owns the connection to `<server>/ws`. It reads the address out of the
+config each time round, dials, runs a session, and backs off before trying again — 1s, 1s,
+2s, 4s, 8s, 16s, 32s, 60s, the ladder from `ControlSocket.kt`. A configuration change
+interrupts the backoff, so re-provisioning a screen reconnects at once rather than waiting
+out a minute to find out whether you typed the address correctly.
+
+The scheme is derived, never stored: `https://…` becomes `wss://`, `http://` and a bare
+`host:port` become `ws://`. Getting that wrong is the nastiest failure in the system,
+because a screen pointed at `ws://` on an HTTPS tunnel fails in a way that looks like a
+cabling problem.
+
+On connect it sends `hello`, and every 30 seconds a `heartbeat` carrying what it is playing,
+where it is in the file, and how much disk is left. It pings every 20 seconds and treats 60
+seconds of silence as a dead connection — a half-open TCP socket never errors on its own.
+
+An `assign` downloads the video with a resumable `Range` request, replays anything already
+on disk through the SHA-256 hasher so a resumed transfer can still be verified whole, checks
+the digest against what the server said, and only then moves the file into place. Progress
+goes back every 10%. Failures are reported with the same codes as the Android player, and
+`NETWORK_ERROR`/`HTTP_ERROR` are load-bearing: the server matches on them to print its
+"PUBLIC_URL is unreachable from the players" diagnostic.
+
+Two departures from the Android player, both deliberate:
+
+- **Resumable failures are retried**, up to five times on the same backoff ladder. Android
+  computes `resumable` and then never reads it, so a failed download there waits for the
+  server to send another assign.
+- **`reboot` restarts the app, not the PC.** Android reboots the stick, which it can do as
+  device owner. Rebooting a shop's computer from a dashboard is a much bigger hammer than
+  whoever clicked it is expecting.
+
+Kept as-is even though it is arguably a bug, because the two clients must behave the same
+under the same server message: a second `assign` arriving mid-download is **dropped, not
+queued**.
 
 ## Tests
 
@@ -194,6 +232,19 @@ On macOS, against a real 10-second campaign video:
   after ten seconds into playback.
 - `--kiosk` and `--no-kiosk` toggle the lock on a running screen and the choice persists.
 
+Against the real NestJS server, over an `https://` ngrok tunnel — so `wss://` and TLS were
+exercised, not just plain `ws://` on a LAN:
+
+- A freshly wiped screen connects, sends exactly **one** `hello`, receives **one** `assign`,
+  downloads 4 MB, verifies the SHA-256, promotes and plays — reporting progress at every
+  10%.
+- The server lists it as `desktop-0.1.2`, online, in store 710, with the name it was given.
+- Heartbeats carry real values: playing, position, free bytes, uptime.
+- `identify` shows the name, `reload` rebuilds the player and **resumes at 7198 ms** rather
+  than restarting the loop, `getLogs` puts 4489 bytes into the dashboard.
+- `configure` from the dashboard moves the screen to another store, and it re-announces with
+  the new store so that store's campaign follows it.
+
 ## Not verified
 
 Everything Windows-specific, because it cannot be exercised from a Mac and Tauri cannot
@@ -211,6 +262,11 @@ branch of `kiosk.rs` compiles at all:
 
 Also untested anywhere: a 12-hour soak, and whether the seam at the loop point is visible
 on a real screen. The Android player has the same open question.
+
+Untested on the control channel specifically: a genuinely interrupted download resuming
+across a restart (the local tunnel completes in a second), a full disk, and anything
+involving more than one screen. Group sync is Phase D and not written — a screen currently
+ignores `groupId` and `startEpochMs` beyond storing them.
 
 Two things verified only by reading, not by running. This machine grants the shell neither
 screen-recording nor accessibility permission, so the UI cannot be seen or clicked from a

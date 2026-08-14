@@ -1,9 +1,12 @@
 pub mod app;
 pub mod cli;
 pub mod config;
+pub mod download;
 pub mod kiosk;
 pub mod logs;
 pub mod media_server;
+pub mod protocol;
+pub mod service;
 pub mod store;
 
 use tauri::{Manager, WindowEvent};
@@ -86,6 +89,10 @@ pub fn run() {
             let config = ConfigStore::load(&dir)?;
             linfo!("Device id {}", config.snapshot().device_id);
             tauri_app.manage(AppState::new(store, media_server, config));
+
+            // Started before provisioning is applied, so a screen launched with --server
+            // connects on the first pass rather than waiting for a config change.
+            service::start(&handle);
 
             // Provisioning passed to *this* process. A second launch takes the same path
             // through the single-instance plugin above.

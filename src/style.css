@@ -77,6 +77,26 @@ body {
   line-height: 1.5;
 }
 
+#identify {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #b0000000;
+  color: #4fc3f7;
+  font-size: 6rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 2rem;
+  word-break: break-word;
+}
+
+#identify[hidden] {
+  display: none;
+}
+
 /* ------------------------------------------------------------------ setup ---
    The one screen a human is meant to read and type into, so the pointer comes
    back and the type is large enough to read from arm's length at a shop

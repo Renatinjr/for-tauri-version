@@ -205,7 +205,28 @@ pub fn apply_cli_provisioning(app: &AppHandle, provisioning: &Provisioning) {
     }
 }
 
-/// Tells the frontend the identity changed, so the setup form and the prompt stay honest.
+/// Re-provisioning from the dashboard.
+///
+/// The server does not update its own record here — it relies on the screen persisting the
+/// change and announcing again, which is what then pushes the new store's campaign. So
+/// this must go through the same path as every other provisioning change.
+pub fn apply_remote_configure(app: &AppHandle, store_id: Option<&str>, device_name: Option<&str>) {
+    let state = app.state::<AppState>();
+    match state
+        .config
+        .set_provisioning(None, device_name, store_id, None)
+    {
+        Ok(false) => linfo!("Configure matched what was already stored"),
+        Ok(true) => {
+            linfo!("Re-provisioned by the dashboard");
+            announce_config(app, &state);
+        }
+        Err(err) => lerror!("Could not save the dashboard's configure: {err}"),
+    }
+}
+
+/// Tells the frontend the identity changed, so the setup form and the prompt stay honest,
+/// and tells the control channel, so it reconnects or re-announces.
 fn announce_config(app: &AppHandle, state: &AppState) {
     let payload = ConfigChanged {
         config: state.config_view(),
@@ -213,6 +234,9 @@ fn announce_config(app: &AppHandle, state: &AppState) {
     };
     if let Err(err) = app.emit("config-changed", payload) {
         lwarn!("Could not tell the screen about the new config: {err}");
+    }
+    if let Some(control) = app.try_state::<crate::service::ControlHandle>() {
+        control.config_changed();
     }
 }
 
@@ -294,7 +318,7 @@ pub fn save_provisioning(
 
     validate_provisioning(server, store_id)?;
 
-    state
+    let changed = state
         .config
         .set_provisioning(
             Some(server),
@@ -308,14 +332,21 @@ pub fn save_provisioning(
         )
         .map_err(|err| format!("Não foi possível salvar: {err}"))?;
 
-    let config = state.config.snapshot();
-    linfo!(
-        "Provisioned from the setup screen: server={:?} store={:?} name={:?}",
-        config.server,
-        config.store_id,
-        config.device_name
-    );
-    announce_config(&app, &state);
+    if changed {
+        let config = state.config.snapshot();
+        linfo!(
+            "Provisioned from the setup screen: server={:?} store={:?} name={:?}",
+            config.server,
+            config.store_id,
+            config.device_name
+        );
+        announce_config(&app, &state);
+    } else {
+        // Pressing Save on an unchanged form is the common case — the form opens on every
+        // launch already filled in. Announcing anyway would put a pointless second hello
+        // on the wire and bring back a redundant assign.
+        linfo!("Setup saved with no changes");
+    }
     Ok(state.config_view())
 }
 

@@ -29,6 +29,19 @@ fs4 = "1"
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
 
+# The control channel and downloads. rustls throughout rather than the platform TLS stack,
+# so a `wss://` tunnel behaves the same on the Windows screens as it does here.
+tokio = { version = "1", features = ["macros", "sync", "time", "io-util", "fs"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+reqwest = { version = "0.13", default-features = false, features = [
+    "stream",
+    "rustls",
+    # System trust store, so a store behind a corporate proxy CA still downloads.
+    "rustls-native-certs",
+] }
+sha2 = "0.11"
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = ["Win32_System_Power"] }
 
