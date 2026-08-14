@@ -510,13 +510,16 @@ async fn run_download(
                     failure.code,
                     failure.detail
                 );
-                report_error(app, failure.code, failure.detail.clone());
-
                 if !failure.resumable || attempt == DOWNLOAD_ATTEMPTS {
                     lerror!(
                         "Giving up on {}; the screen keeps what it had",
                         request.video_id
                     );
+                    // Only now is this the dashboard's business. Reporting every attempt
+                    // meant one dropped connection — which the very next try fixed —
+                    // surfaced on the server as an error blaming PUBLIC_URL, for a screen
+                    // that went on to download and play perfectly well.
+                    report_error(app, failure.code, failure.detail);
                     return;
                 }
                 tokio::time::sleep(Duration::from_millis(backoff_ms(attempt))).await;

@@ -61,6 +61,28 @@ impl Failure {
             resumable,
         }
     }
+
+    /// For an error whose real cause is buried in its source chain.
+    fn from_source(code: &'static str, err: &reqwest::Error, resumable: bool) -> Self {
+        Self::new(code, describe(err), resumable)
+    }
+}
+
+/// Flattens an error and everything that caused it into one line.
+///
+/// `reqwest::Error`'s own `Display` is just "error sending request for url (…)" — a TLS
+/// failure, a refused connection and a DNS failure all print identically. That line is
+/// what the dashboard shows, so on its own it turns every download failure into the same
+/// unactionable message.
+fn describe(err: &dyn std::error::Error) -> String {
+    let mut out = err.to_string();
+    let mut source = err.source();
+    while let Some(cause) = source {
+        out.push_str(": ");
+        out.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    out
 }
 
 pub struct Downloader {
@@ -120,7 +142,7 @@ impl Downloader {
         let response = builder
             .send()
             .await
-            .map_err(|err| Failure::new(NETWORK_ERROR, err.to_string(), true))?;
+            .map_err(|err| Failure::from_source(NETWORK_ERROR, &err, true))?;
 
         let status = response.status().as_u16();
         match status {
@@ -238,7 +260,7 @@ async fn stream_to_disk(
     let mut stream = response.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|err| Failure::new(NETWORK_ERROR, err.to_string(), true))?;
+        let chunk = chunk.map_err(|err| Failure::from_source(NETWORK_ERROR, &err, true))?;
         file.write_all(&chunk)
             .await
             .map_err(|err| Failure::new(NETWORK_ERROR, err.to_string(), true))?;
