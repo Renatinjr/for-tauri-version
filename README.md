@@ -1,4 +1,4 @@
-# Katuxa Signage — desktop player
+# K-player — desktop
 
 A Windows digital-signage player for the same fleet as the Android TV player in
 `../exo-player`. It speaks the same protocol to the same management server
@@ -73,7 +73,7 @@ borderless, so it has no close button of its own.
 **The command line**, which is the equivalent of `adb shell am start -S --es …`:
 
 ```bash
-signage-desktop.exe --server 192.168.1.10:8080 --store 710 --name pc-entrada-01 --kiosk
+K-player.exe --server 192.168.1.10:8080 --store 710 --name pc-entrada-01 --kiosk
 ```
 
 Run against a screen that is already running, this re-provisions it in place:

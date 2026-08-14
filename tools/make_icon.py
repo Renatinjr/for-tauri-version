@@ -4,18 +4,22 @@
 bundler wants. Kept in the repo so the icon is reproducible rather than a binary somebody
 once dragged in.
 
-The motif matches the Android player's leanback banner: a screen outline with a play
-triangle, in the same palette.
+K-player is strictly monochrome, so this is a white play mark on a black rounded tile —
+the same motif as the Android launcher icon and banner, drawn from the same numbers.
 """
 
+import math
 import os
 import struct
 import zlib
 
 SIZE = 1024
-BG = (0x10, 0x14, 0x18)
-SCREEN = (0x1C, 0x24, 0x2C)
-ACCENT = (0x4F, 0xC3, 0xF7)
+BLACK = (0x00, 0x00, 0x00)
+WHITE = (0xFF, 0xFF, 0xFF)
+
+# The rounded tile, in 1024-unit coordinates.
+INSET = 96
+RADIUS = 224
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon-source.png")
 
@@ -26,32 +30,44 @@ def chunk(tag, data):
 
 
 def render():
-    s = SIZE / 1024.0
-    px = [[BG for _ in range(SIZE)] for _ in range(SIZE)]
+    # Alpha, not colour: the tile has to be transparent outside its rounded corners or it
+    # shows as a black square on a dark taskbar.
+    px = [[(0, 0, 0, 0) for _ in range(SIZE)] for _ in range(SIZE)]
 
-    def rect(x0, y0, x1, y1, colour):
-        for y in range(max(0, round(y0 * s)), min(SIZE, round(y1 * s))):
-            row = px[y]
-            for x in range(max(0, round(x0 * s)), min(SIZE, round(x1 * s))):
-                row[x] = colour
+    x0, y0 = INSET, INSET
+    x1, y1 = SIZE - INSET, SIZE - INSET
 
-    # Screen body and stand, in 1024-unit coordinates.
-    rect(160, 200, 864, 660, SCREEN)
-    rect(460, 664, 564, 700, SCREEN)
-    rect(360, 700, 664, 736, SCREEN)
+    def rounded_tile_alpha(x, y):
+        """Coverage of the rounded rectangle at a pixel centre, 0..1, softened at the edge."""
+        cx = min(max(x, x0 + RADIUS), x1 - RADIUS)
+        cy = min(max(y, y0 + RADIUS), y1 - RADIUS)
+        # Inside the straight part of either axis: a plain rectangle test.
+        if x0 <= x <= x1 and y0 <= y <= y1 and (cx == x or cy == y):
+            return 1.0
+        distance = math.hypot(x - cx, y - cy)
+        # One pixel of feathering, so the corners are not stair-stepped.
+        return max(0.0, min(1.0, RADIUS + 0.5 - distance))
 
-    # Play triangle, apex right: (420,300) - (700,430) - (420,560).
-    y0, y1 = round(300 * s), round(560 * s)
-    cy = (y0 + y1) / 2
-    half = (y1 - y0) / 2
-    x_start = round(420 * s)
-    span = 280 * s
-    for y in range(max(0, y0), min(SIZE, y1)):
-        t = abs(y - cy) / half
-        x_end = round(x_start + span * (1 - t))
+    # Play triangle, apex right: (400,300) - (720,512) - (400,724).
+    tri_x0, tri_top, tri_bottom = 400, 300, 724
+    tri_span = 320
+    tri_cy = (tri_top + tri_bottom) / 2
+    tri_half = (tri_bottom - tri_top) / 2
+
+    for y in range(SIZE):
         row = px[y]
-        for x in range(x_start, min(SIZE, x_end)):
-            row[x] = ACCENT
+        for x in range(SIZE):
+            tile = rounded_tile_alpha(x + 0.5, y + 0.5)
+            if tile <= 0:
+                continue
+
+            colour = BLACK
+            if tri_top <= y < tri_bottom and x >= tri_x0:
+                t = abs(y + 0.5 - tri_cy) / tri_half
+                if x < tri_x0 + tri_span * (1 - t):
+                    colour = WHITE
+
+            row[x] = (colour[0], colour[1], colour[2], round(255 * tile))
 
     return px
 
@@ -59,12 +75,13 @@ def render():
 def main():
     px = render()
     raw = b"".join(
-        b"\x00" + b"".join(struct.pack("3B", *px[y][x]) for x in range(SIZE))
+        b"\x00" + b"".join(struct.pack("4B", *px[y][x]) for x in range(SIZE))
         for y in range(SIZE)
     )
     png = (
         b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", SIZE, SIZE, 8, 2, 0, 0, 0))
+        # Colour type 6: truecolour with alpha.
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", SIZE, SIZE, 8, 6, 0, 0, 0))
         + chunk(b"IDAT", zlib.compress(raw, 9))
         + chunk(b"IEND", b"")
     )

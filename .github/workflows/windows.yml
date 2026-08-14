@@ -129,7 +129,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: katuxa-signage-windows
+          name: k-player-windows
           path: installers/*
           if-no-files-found: error
           retention-days: 30
@@ -142,7 +142,7 @@ jobs:
           draft: true
           generate_release_notes: true
           body: |
-            Windows player for the Katuxa store fleet.
+            K-player, the Windows screen player for the Katuxa store fleet.
 
             Install with either file — the `.exe` for a single machine, the `.msi` if IT is
             pushing it across the fleet. Both are **unsigned**, so SmartScreen will warn on
@@ -152,5 +152,5 @@ jobs:
             After installing, provision the screen:
 
             ```
-            "C:\Program Files\Katuxa Signage\Katuxa Signage.exe" --server <host:port> --store <id> --name <screen>
+            "C:\Program Files\K-player\K-player.exe" --server <host:port> --store <id> --name <screen>
             ```

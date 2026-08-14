@@ -37,6 +37,8 @@ interface ConfigChanged {
 const video = document.querySelector<HTMLVideoElement>("#video")!;
 const freeze = document.querySelector<HTMLCanvasElement>("#freeze")!;
 const notice = document.querySelector<HTMLDivElement>("#notice")!;
+/** The frosted card inside it; the outer element is only the backdrop. */
+const noticeCard = document.querySelector<HTMLDivElement>("#notice .card")!;
 
 /** Everything the frontend logs goes into the same rolling file as the Rust side, so
  *  `getLogs` from the dashboard returns one coherent story rather than half of one. */
@@ -66,7 +68,7 @@ const setup = new SetupScreen(
 function showNotice(n: Notice | null): void {
   if (!n) {
     notice.hidden = true;
-    notice.replaceChildren();
+    noticeCard.replaceChildren();
     return;
   }
   const title = document.createElement("div");
@@ -75,16 +77,17 @@ function showNotice(n: Notice | null): void {
   const detail = document.createElement("div");
   detail.className = "detail";
   detail.textContent = n.detail;
-  notice.replaceChildren(title, detail);
+  noticeCard.replaceChildren(title, detail);
   notice.hidden = false;
 }
 
 const identify = document.querySelector<HTMLDivElement>("#identify")!;
+const identifyName = document.querySelector<HTMLDivElement>("#identify .name")!;
 let identifyTimer: number | null = null;
 
 /** Ten seconds of the screen's name, so somebody in the shop can tell which one it is. */
 function showIdentity(name: string): void {
-  identify.textContent = name;
+  identifyName.textContent = name;
   identify.hidden = false;
   if (identifyTimer !== null) window.clearTimeout(identifyTimer);
   identifyTimer = window.setTimeout(() => {
