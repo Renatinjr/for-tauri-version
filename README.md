@@ -86,9 +86,46 @@ same id, so two screens sharing one would kill each other in a reconnect loop.
 ## Tests
 
 ```bash
-cd src-tauri && cargo test     # media store, Range parsing, log rotation
-pnpm test                      # frontend (arrives with the sync maths in Phase D)
+cd src-tauri && cargo test                        # media store, config, CLI, Range parsing
+cd src-tauri && cargo clippy --all-targets -- -D warnings
+cd src-tauri && cargo fmt --check
+pnpm build                                        # typecheck + bundle
+pnpm test                                         # frontend (sync maths arrive in Phase D)
 ```
+
+CI runs exactly these, on Windows.
+
+## Building the Windows installers
+
+Tauri cannot cross-compile to Windows — the bundler needs the Windows toolchain, WiX and
+NSIS, and `tauri-build` will not even `cargo check` for the target without a Windows
+resource compiler. So `.github/workflows/windows.yml` is the only place the shipped binary
+is produced.
+
+| Trigger | What happens |
+|---|---|
+| push to `main`, or a pull request | tests only |
+| **Actions → windows → Run workflow** | tests, then installers as a downloadable artifact |
+| a `v*` tag | tests, installers, and a **draft** GitHub release with both attached |
+
+The manual run is the one to reach for normally: no tag, no release, just a
+`katuxa-signage-windows` artifact holding both installers, kept for 30 days. It takes a
+`debug_bundle` option that skips the optimised build — faster, larger, and it keeps the
+console window, which is useful the first time something misbehaves on real hardware.
+
+Two installers come out on purpose: the NSIS `.exe` is the one to hand somebody, the `.msi`
+is the one IT can push with Group Policy across fifteen stores.
+
+Tagging checks that the tag agrees with `version` in both `Cargo.toml` and
+`tauri.conf.json` and fails if it does not — Windows keys upgrades off that version, so an
+installer that misreports it is worse than a failed build. Bump both, then tag.
+
+**The installers are unsigned.** SmartScreen will warn on first run ("More info" → "Run
+anyway"). Signing needs a code-signing certificate; until there is one, that warning is
+part of the install.
+
+**This repository has no GitHub remote yet**, so none of the above runs. Push it to GitHub
+first — the workflow needs no secrets, only `contents: write`, which it declares itself.
 
 ## How this maps to the Android player
 
@@ -146,7 +183,9 @@ On macOS, against a real 10-second campaign video:
 ## Not verified
 
 Everything Windows-specific, because it cannot be exercised from a Mac and Tauri cannot
-cross-compile to Windows. These are the Phase D CI job's first real job:
+cross-compile to Windows. The CI workflow exists now but has never run — the repository has
+no remote — so this list is still entirely open, starting with whether the Windows-only
+branch of `kiosk.rs` compiles at all:
 
 - `SetThreadExecutionState` actually holding the display awake over 30+ minutes
 - autostart at logon, and the app surviving a reboot

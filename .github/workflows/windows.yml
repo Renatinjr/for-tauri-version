@@ -1,0 +1,156 @@
+# Builds the Windows player.
+#
+# This repository is developed on macOS, and Tauri cannot cross-compile to Windows — the
+# bundler needs the Windows toolchain, WiX and NSIS. So Windows is built here, and this
+# workflow is the only place the shipped binary is ever produced.
+#
+# It is also where the Windows-only code is tested for the first time: path handling in
+# `store.rs`, and the `SetThreadExecutionState` call in `kiosk.rs`, which is compiled out
+# entirely on the development machine.
+#
+#   push / pull request   -> test only
+#   workflow_dispatch     -> test, then build installers and keep them as artifacts
+#   tag v*                -> test, build, and attach the installers to a GitHub release
+
+name: windows
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      debug_bundle:
+        description: "Build a debug bundle (faster, larger, keeps the console window)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and build the frontend
+        run: pnpm build
+
+      - name: Frontend tests
+        run: pnpm test
+
+      - name: Rust formatting
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Rust lint
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      # The first time any of this runs on the platform it actually ships to. Windows path
+      # semantics and the keep-awake call are compiled out on the machine it was written on.
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+  bundle:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # A tag that disagrees with the version in the manifests produces installers that
+      # claim to be something they are not, and Windows upgrades key off that version.
+      # Better to fail here than to ship it.
+      - name: Check the tag matches the manifests
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          $conf = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          Write-Host "tag=$tag tauri.conf.json=$conf Cargo.toml=$cargo"
+          if ($tag -ne $conf -or $tag -ne $cargo) {
+            throw "Version mismatch: tag $tag, tauri.conf.json $conf, Cargo.toml $cargo"
+          }
+
+      - name: Build installers
+        run: pnpm tauri build ${{ inputs.debug_bundle && '--debug' || '' }}
+
+      # Two installers on purpose: NSIS is the one to hand somebody, MSI is the one an IT
+      # department can push with Group Policy across fifteen stores.
+      - name: Collect the installers
+        shell: pwsh
+        run: |
+          $target = if ("${{ inputs.debug_bundle }}" -eq "true") { "debug" } else { "release" }
+          New-Item -ItemType Directory -Force -Path installers | Out-Null
+          Get-ChildItem "src-tauri/target/$target/bundle" -Recurse -Include *.exe, *.msi |
+            ForEach-Object { Copy-Item $_.FullName installers/ }
+          Get-ChildItem installers | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: katuxa-signage-windows
+          path: installers/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: installers/*
+          draft: true
+          generate_release_notes: true
+          body: |
+            Windows player for the Katuxa store fleet.
+
+            Install with either file — the `.exe` for a single machine, the `.msi` if IT is
+            pushing it across the fleet. Both are **unsigned**, so SmartScreen will warn on
+            first run; choose "More info" then "Run anyway", or sign them with a code
+            signing certificate before rolling out.
+
+            After installing, provision the screen:
+
+            ```
+            "C:\Program Files\Katuxa Signage\Katuxa Signage.exe" --server <host:port> --store <id> --name <screen>
+            ```

@@ -187,7 +187,10 @@ mod tests {
         rotate_if_needed(&dir).unwrap();
 
         assert!(!current(&dir).exists(), "current should have been renamed");
-        assert!(previous(&dir).exists(), "previous should now hold the old file");
+        assert!(
+            previous(&dir).exists(),
+            "previous should now hold the old file"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }

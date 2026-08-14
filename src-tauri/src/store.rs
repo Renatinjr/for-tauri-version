@@ -28,7 +28,10 @@ pub struct MediaStore {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Space {
     Ok,
-    Insufficient { required_bytes: u64, free_bytes: u64 },
+    Insufficient {
+        required_bytes: u64,
+        free_bytes: u64,
+    },
 }
 
 impl MediaStore {
@@ -136,7 +139,11 @@ impl MediaStore {
             let path = entry.path();
             if path.is_file() && video_id_of(&path) != video_id {
                 let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-                linfo!("Discarding stale partial {} ({} bytes)", path.display(), size);
+                linfo!(
+                    "Discarding stale partial {} ({} bytes)",
+                    path.display(),
+                    size
+                );
                 let _ = fs::remove_file(&path);
             }
         }
@@ -219,7 +226,10 @@ mod tests {
     #[test]
     fn rejects_ids_that_would_escape_the_media_directory() {
         assert_eq!(sanitize_video_id("campaign_98x"), Some("campaign_98x"));
-        assert_eq!(sanitize_video_id("vid.2026-08_promo"), Some("vid.2026-08_promo"));
+        assert_eq!(
+            sanitize_video_id("vid.2026-08_promo"),
+            Some("vid.2026-08_promo")
+        );
         assert_eq!(sanitize_video_id("../../etc/passwd"), None);
         assert_eq!(sanitize_video_id("..\\windows\\system32"), None);
         assert_eq!(sanitize_video_id("has space"), None);

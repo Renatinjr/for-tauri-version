@@ -56,7 +56,10 @@ pub fn spawn(media_dir: PathBuf) -> Result<MediaServer> {
         .ok_or_else(|| anyhow!("media server bound to a non-IP address"))?
         .port();
     let base_url = format!("http://127.0.0.1:{port}/{token}");
-    linfo!("Media server on 127.0.0.1:{port}, serving {}", media_dir.display());
+    linfo!(
+        "Media server on 127.0.0.1:{port}, serving {}",
+        media_dir.display()
+    );
 
     let server = Arc::new(server);
     let prefix = format!("/{token}/");
@@ -164,8 +167,7 @@ fn respond_plain(request: Request, status: u16, body: &str) -> Result<()> {
 
 fn header(field: &str, value: &str) -> Header {
     // Both sides are string literals or numbers we just formatted, so this cannot fail.
-    Header::from_bytes(field.as_bytes(), value.as_bytes())
-        .expect("static header is well formed")
+    Header::from_bytes(field.as_bytes(), value.as_bytes()).expect("static header is well formed")
 }
 
 /// `bytes=N-` or `bytes=N-M`. Anything else — suffix ranges, multiple ranges, a different
@@ -205,7 +207,11 @@ mod tests {
     #[test]
     fn malformed_ranges_are_ignored_not_rejected() {
         assert_eq!(parse_range("llamas=1-2"), None);
-        assert_eq!(parse_range("bytes=-500"), None, "suffix ranges are not supported");
+        assert_eq!(
+            parse_range("bytes=-500"),
+            None,
+            "suffix ranges are not supported"
+        );
         assert_eq!(parse_range("bytes=abc-"), None);
         assert_eq!(parse_range("bytes=10-5"), None, "end before start");
         assert_eq!(parse_range("bytes=0-1,4-5"), None, "multipart");

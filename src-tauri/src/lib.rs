@@ -66,7 +66,10 @@ pub fn run() {
             let dir = app::data_dir(&handle)?;
 
             logs::init(&dir.join("logs"))?;
-            linfo!("--- signage-desktop {} starting ---", env!("CARGO_PKG_VERSION"));
+            linfo!(
+                "--- signage-desktop {} starting ---",
+                env!("CARGO_PKG_VERSION")
+            );
             linfo!("Data directory: {}", dir.display());
 
             let store = MediaStore::new(&dir)?;

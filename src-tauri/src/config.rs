@@ -46,7 +46,8 @@ impl Config {
             return None;
         }
         let lower = raw.to_ascii_lowercase();
-        Some(if lower.starts_with("ws://") || lower.starts_with("wss://") {
+        // Slicing `raw`, not `lower`, so the host keeps whatever casing it was given.
+        let url = if lower.starts_with("ws://") || lower.starts_with("wss://") {
             format!("{raw}/ws")
         } else if lower.starts_with("https://") {
             format!("wss://{}/ws", &raw[8..])
@@ -54,7 +55,8 @@ impl Config {
             format!("ws://{}/ws", &raw[7..])
         } else {
             format!("ws://{raw}/ws")
-        })
+        };
+        Some(url)
     }
 
     pub fn display_name(&self) -> &str {
@@ -190,7 +192,9 @@ mod tests {
     #[test]
     fn https_becomes_wss() {
         assert_eq!(
-            with_server("https://tunnel.example.com").control_url().as_deref(),
+            with_server("https://tunnel.example.com")
+                .control_url()
+                .as_deref(),
             Some("wss://tunnel.example.com/ws")
         );
     }
@@ -206,7 +210,9 @@ mod tests {
     #[test]
     fn an_explicit_websocket_scheme_is_left_alone() {
         assert_eq!(
-            with_server("wss://tunnel.example.com").control_url().as_deref(),
+            with_server("wss://tunnel.example.com")
+                .control_url()
+                .as_deref(),
             Some("wss://tunnel.example.com/ws")
         );
         assert_eq!(
@@ -218,7 +224,9 @@ mod tests {
     #[test]
     fn surrounding_whitespace_and_trailing_slashes_go() {
         assert_eq!(
-            with_server("  http://10.0.0.4:8080/  ").control_url().as_deref(),
+            with_server("  http://10.0.0.4:8080/  ")
+                .control_url()
+                .as_deref(),
             Some("ws://10.0.0.4:8080/ws")
         );
     }
@@ -226,7 +234,9 @@ mod tests {
     #[test]
     fn the_scheme_match_is_case_insensitive_but_the_host_keeps_its_casing() {
         assert_eq!(
-            with_server("HTTPS://Tunnel.Example.COM").control_url().as_deref(),
+            with_server("HTTPS://Tunnel.Example.COM")
+                .control_url()
+                .as_deref(),
             Some("wss://Tunnel.Example.COM/ws")
         );
     }
@@ -254,7 +264,9 @@ mod tests {
         assert_eq!(config.device_name.as_deref(), Some("tv-entrada-01"));
         assert_eq!(config.store_id.as_deref(), Some("704"));
 
-        store.set_current_video(Some("v1"), Some("entrada"), Some(42)).unwrap();
+        store
+            .set_current_video(Some("v1"), Some("entrada"), Some(42))
+            .unwrap();
         store.set_current_video(None, None, None).unwrap();
         let config = store.snapshot();
         assert_eq!(config.current_video_id, None);
