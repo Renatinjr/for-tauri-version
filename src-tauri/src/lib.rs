@@ -1,4 +1,6 @@
 pub mod app;
+pub mod cli;
+pub mod config;
 pub mod kiosk;
 pub mod logs;
 pub mod media_server;
@@ -8,6 +10,7 @@ use tauri::{Manager, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 use crate::app::AppState;
+use crate::config::ConfigStore;
 use crate::store::MediaStore;
 // `linfo!`/`lwarn!` are `#[macro_export]`ed, which places them in this module already.
 
@@ -26,7 +29,9 @@ pub fn run() {
         // `adb shell am start -S --es …` on the Android side. The running instance takes
         // the new arguments; the new process exits immediately.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            linfo!("Second launch forwarded: {:?}", argv.get(1..).unwrap_or(&[]));
+            let forwarded = argv.get(1..).unwrap_or(&[]);
+            linfo!("Second launch forwarded: {forwarded:?}");
+            app::apply_cli_provisioning(app, &cli::parse(forwarded));
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
             }
@@ -37,6 +42,7 @@ pub fn run() {
         ))
         .invoke_handler(tauri::generate_handler![
             app::bootstrap,
+            app::save_provisioning,
             app::media_switched,
             app::media_released,
             app::report_playback,
@@ -65,7 +71,13 @@ pub fn run() {
 
             let store = MediaStore::new(&dir)?;
             let media_server = media_server::spawn(store.media_dir.clone())?;
-            tauri_app.manage(AppState::new(store, media_server));
+            let config = ConfigStore::load(&dir)?;
+            linfo!("Device id {}", config.snapshot().device_id);
+            tauri_app.manage(AppState::new(store, media_server, config));
+
+            // Provisioning passed to *this* process. A second launch takes the same path
+            // through the single-instance plugin above.
+            app::apply_cli_provisioning(&handle, &cli::parse(std::env::args().skip(1)));
 
             kiosk::keep_awake();
 

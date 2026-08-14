@@ -9,6 +9,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Player, type LogLevel } from "./player";
+import { SetupScreen, type ConfigView } from "./setup";
 
 interface MediaRef {
   videoId: string;
@@ -23,6 +24,13 @@ interface Notice {
 interface Bootstrap {
   media: MediaRef | null;
   notice: Notice | null;
+  config: ConfigView;
+  needsProvisioning: boolean;
+}
+
+interface ConfigChanged {
+  config: ConfigView;
+  needsProvisioning: boolean;
 }
 
 const video = document.querySelector<HTMLVideoElement>("#video")!;
@@ -37,6 +45,21 @@ function log(level: LogLevel, message: string): void {
 }
 
 const player = new Player(video, freeze, log);
+
+/** Kept current so Ctrl+Shift+S can open the setup screen prefilled. */
+let config: ConfigView = {
+  deviceId: "",
+  deviceName: null,
+  storeId: null,
+  server: null,
+};
+
+const setup = new SetupScreen(log, (saved) => {
+  config = saved;
+  log("i", `Provisioned: store ${saved.storeId ?? "none"} at ${saved.server ?? "none"}`);
+  // Phase C reconnects the control socket here. Until then, saving is all there is to do.
+  void refresh();
+});
 
 function showNotice(n: Notice | null): void {
   if (!n) {
@@ -64,13 +87,40 @@ function play(media: MediaRef): void {
   });
 }
 
+/** Re-reads the whole state from Rust and shows whatever it says to show. */
+async function refresh(): Promise<void> {
+  const state = await invoke<Bootstrap>("bootstrap");
+  config = state.config;
+
+  if (state.needsProvisioning) {
+    log("i", "Unprovisioned and nothing to play — opening setup");
+    setup.show(state.config, false);
+    showNotice(null);
+    return;
+  }
+
+  if (state.media) {
+    log("i", `Starting on local media ${state.media.videoId}`);
+    play(state.media);
+  } else {
+    log("i", "Nothing to play yet");
+    showNotice(state.notice);
+  }
+}
+
 async function main(): Promise<void> {
   await listen<MediaRef>("play", (event) => {
     log("i", `Now playing ${event.payload.videoId}`);
+    setup.hide();
     play(event.payload);
   });
 
   await listen<Notice | null>("notice", (event) => showNotice(event.payload));
+
+  await listen<ConfigChanged>("config-changed", (event) => {
+    config = event.payload.config;
+    setup.refresh(event.payload.config, event.payload.needsProvisioning);
+  });
 
   // Rust is about to move or delete the file underneath us.
   await listen<null>("release", () => {
@@ -82,22 +132,10 @@ async function main(): Promise<void> {
   await listen<null>("reload", () => {
     log("i", "Reload requested");
     player.stop();
-    void invoke("bootstrap")
-      .then((state) => {
-        const s = state as Bootstrap;
-        if (s.media) play(s.media);
-      })
-      .catch((err: unknown) => log("e", `Reload failed: ${String(err)}`));
+    void refresh().catch((err: unknown) => log("e", `Reload failed: ${String(err)}`));
   });
 
-  const state = await invoke<Bootstrap>("bootstrap");
-  if (state.media) {
-    log("i", `Starting on local media ${state.media.videoId}`);
-    play(state.media);
-  } else {
-    log("i", "Nothing to play at startup");
-    showNotice(state.notice);
-  }
+  await refresh();
 
   // The heartbeat needs a position, and the Android player sampled at the same cadence.
   window.setInterval(() => {
@@ -110,14 +148,20 @@ async function main(): Promise<void> {
 
 // Nothing here is a security boundary — a determined person still has Task Manager. It
 // exists so a customer leaning on the keyboard, or a cleaner with a mouse, cannot take
-// the screen out of playback.
+// the screen out of playback. All of it stands aside while the setup form is open, which
+// is the one screen somebody is meant to type into.
+function typing(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement || target instanceof HTMLButtonElement;
+}
+
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 document.addEventListener("dragstart", (e) => e.preventDefault());
-document.addEventListener("selectstart", (e) => e.preventDefault());
+document.addEventListener("selectstart", (e) => {
+  if (!typing(e.target)) e.preventDefault();
+});
 
 const BLOCKED_KEYS = new Set(["F3", "F5", "F7", "F12"]);
 
-let chordSince: number | null = null;
 let chordTimer: number | null = null;
 
 document.addEventListener("keydown", (e) => {
@@ -125,8 +169,7 @@ document.addEventListener("keydown", (e) => {
   // this a dev machine needs Task Manager to get its desktop back.
   if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "q") {
     e.preventDefault();
-    if (chordSince === null) {
-      chordSince = Date.now();
+    if (chordTimer === null) {
       chordTimer = window.setTimeout(() => {
         log("w", "Exit chord held for 3s — quitting");
         void invoke("request_quit").catch(() => undefined);
@@ -134,6 +177,19 @@ document.addEventListener("keydown", (e) => {
     }
     return;
   }
+
+  // Deliberately open the setup screen on a screen that is already provisioned, to move
+  // it to another store without wiping it.
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    if (!setup.visible) {
+      log("i", "Setup opened from the keyboard");
+      setup.show(config, true);
+    }
+    return;
+  }
+
+  if (setup.visible) return;
 
   if (BLOCKED_KEYS.has(e.key)) {
     e.preventDefault();
@@ -148,7 +204,6 @@ document.addEventListener("keyup", (e) => {
   if (e.key.toLowerCase() === "q" || e.key === "Control" || e.key === "Shift") {
     if (chordTimer !== null) window.clearTimeout(chordTimer);
     chordTimer = null;
-    chordSince = null;
   }
 });
 

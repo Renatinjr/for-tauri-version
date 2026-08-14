@@ -76,3 +76,130 @@ body {
   max-width: 40rem;
   line-height: 1.5;
 }
+
+/* ------------------------------------------------------------------ setup ---
+   The one screen a human is meant to read and type into, so the pointer comes
+   back and the type is large enough to read from arm's length at a shop
+   counter. */
+
+body.setup-open {
+  cursor: auto;
+}
+
+#setup {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #101418;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+#setup[hidden] {
+  display: none;
+}
+
+#setup-form {
+  display: flex;
+  flex-direction: column;
+  width: min(34rem, 100%);
+  gap: 0.35rem;
+}
+
+#setup h1 {
+  font-size: 1.9rem;
+  font-weight: 600;
+  color: #4fc3f7;
+  margin-bottom: 0.25rem;
+}
+
+#setup .hint {
+  color: #9aa4ad;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+
+#setup label {
+  font-size: 0.95rem;
+  color: #9aa4ad;
+  margin-top: 0.9rem;
+}
+
+#setup .optional {
+  color: #626b73;
+}
+
+#setup input {
+  font: inherit;
+  font-size: 1.15rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #2b343d;
+  border-radius: 6px;
+  background: #1c242c;
+  color: #fff;
+  cursor: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#setup input:focus {
+  outline: none;
+  border-color: #4fc3f7;
+}
+
+#setup input::placeholder {
+  color: #5a636b;
+}
+
+#setup .error {
+  margin-top: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+  background: #3a1d1d;
+  color: #ff9a9a;
+  font-size: 1rem;
+}
+
+#setup .error[hidden] {
+  display: none;
+}
+
+#setup .actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+#setup button {
+  font: inherit;
+  font-size: 1.05rem;
+  padding: 0.65rem 1.6rem;
+  border: 0;
+  border-radius: 6px;
+  background: #4fc3f7;
+  color: #101418;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#setup button#setup-cancel {
+  background: transparent;
+  color: #9aa4ad;
+  border: 1px solid #2b343d;
+}
+
+#setup button[hidden] {
+  display: none;
+}
+
+#setup .device-id {
+  margin-top: 1.75rem;
+  font-size: 0.85rem;
+  color: #626b73;
+  user-select: text;
+  -webkit-user-select: text;
+}

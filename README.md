@@ -10,14 +10,17 @@ channel; the webview owns the `<video>` element and nothing else.
 
 ## Status
 
-**Phase A of four is done.** What exists today: the kiosk shell, the local media store, the
-loopback media server, and looping playback with a watchdog. It plays whatever `.mp4` is in
-its media directory, forever.
+**Phases A and B of four are done.** What exists today: the kiosk shell, the local media
+store, the loopback media server, looping playback with a watchdog, persistent config, and
+provisioning — both a setup screen and the command line. It plays whatever `.mp4` is in its
+media directory, forever, and knows which server and store it belongs to.
+
+It does not talk to the server yet. That is Phase C.
 
 | Phase | Contents | State |
 |---|---|---|
 | A | kiosk shell, media store, loopback media server, looping playback + watchdog | **done** |
-| B | `config.json`, CLI provisioning, setup screen, promote handshake | not started |
+| B | `config.json`, setup screen, CLI provisioning | **done** |
 | C | control channel, `assign`, resumable download + SHA-256, remote commands | not started |
 | D | time sync, group drift correction, nightly restart, Windows CI | not started |
 
@@ -45,6 +48,41 @@ switched — retention is one file, as on Android.
 The rolling log sits next to it in `logs/signage.log`, and carries both the Rust and the
 webview side of the story.
 
+## Provisioning a screen
+
+A screen needs three things: a server address, a store number, and optionally a name. There
+are two ways to give it them, and they write the same `config.json`.
+
+**The setup screen.** It opens by itself when a screen has neither a server nor anything to
+play. On a screen that is already running, Ctrl+Shift+S opens it deliberately — that is how
+you move a screen to another store without wiping it. Esc closes it again.
+
+The prompt is *derived* from "no server and nothing to play", recomputed whenever either
+changes. It is never latched: the Android player used to set it once at boot, which threw
+the setup form over a playing video on every activity recreation. Do not reintroduce that.
+
+**The command line**, which is the equivalent of `adb shell am start -S --es …`:
+
+```bash
+signage-desktop.exe --server 192.168.1.10:8080 --store 710 --name pc-entrada-01
+```
+
+Run against a screen that is already running, this re-provisions it in place:
+`tauri-plugin-single-instance` forwards the arguments to the live instance and the second
+process exits without opening a window. Omitted flags mean *leave alone*, so
+`--store 704` on its own moves the store and keeps the server and name — the same
+convention as `Prefs.setProvisioning`.
+
+The two paths differ in one way, on purpose: the form requires a server and a store,
+because a screen without a store can only ever be addressed individually and that defeats
+the point of campaigns. The command line validates nothing, because a provisioning script
+that wants to set only one field should be able to.
+
+The device id is minted once, on first run, as `pc-` plus ten hex characters — `pc-` rather
+than the Android player's `tv-` so the two are distinguishable in the dashboard with no
+server change. It must stay stable: the server terminates any older socket claiming the
+same id, so two screens sharing one would kill each other in a reconnect loop.
+
 ## Tests
 
 ```bash
@@ -63,11 +101,13 @@ across rather than reinvented.
 | `PlayerController.kt` | `src/player.ts` |
 | `data/MediaStore.kt` | `src-tauri/src/store.rs` |
 | `data/LogStore.kt` | `src-tauri/src/logs.rs` |
+| `data/Prefs.kt` | `src-tauri/src/config.rs` |
+| `setup/SetupActivity.kt` | `src/setup.ts` + `src-tauri/src/cli.rs` |
 | `PlayerService.kt` | `src-tauri/src/app.rs` (+ `socket.rs`, `download.rs` in Phase C) |
 | lock task mode / device owner | fullscreen always-on-top window, close refused |
 | HOME intent filter | `tauri-plugin-autostart` |
 | `FLAG_KEEP_SCREEN_ON` | `SetThreadExecutionState`, `src-tauri/src/kiosk.rs` |
-| `adb shell am start -S --es …` | a second launch, forwarded by `tauri-plugin-single-instance` (Phase B) |
+| `adb shell am start -S --es …` | a second launch, forwarded by `tauri-plugin-single-instance` |
 | `adb` as the escape hatch | Ctrl+Shift+Q held for three seconds |
 
 Two things are done differently on purpose, and both are Windows consequences:
@@ -96,6 +136,12 @@ On macOS, against a real 10-second campaign video:
 - Path traversal (`..%2f..%2f`), a wrong token, and a missing file all return 404.
 - Newest-file-wins and retention: with two videos present, the newer one played and the
   older was deleted.
+- Provisioning, end to end: a wiped screen opens the setup form by itself; a second launch
+  with `--server --store --name` re-provisions the running instance and the form closes
+  itself; `--store 704` alone moves the store and leaves the server and name intact; and a
+  provisioned screen with a video on disk never opens the form at all.
+- `config.json` survives a restart, keeps its device id, and is replaced rather than fatal
+  when corrupt.
 
 ## Not verified
 
@@ -112,3 +158,8 @@ cross-compile to Windows. These are the Phase D CI job's first real job:
 
 Also untested anywhere: a 12-hour soak, and whether the seam at the loop point is visible
 on a real screen. The Android player has the same open question.
+
+One thing verified only by behaviour, not by eye: the setup screen's **appearance**. This
+machine will not grant the shell screen-recording permission, so its layout, contrast and
+focus order have not been looked at — only that it opens, closes, validates and saves when
+it should. Worth a glance the first time you run it.

@@ -12,6 +12,53 @@
     <canvas id="freeze"></canvas>
     <video id="video" playsinline></video>
     <div id="notice" hidden></div>
+
+    <div id="setup" hidden>
+      <form id="setup-form" novalidate>
+        <h1>Configurar tela</h1>
+        <p class="hint" id="setup-hint"></p>
+
+        <label for="setup-server">Endereço do servidor</label>
+        <input
+          id="setup-server"
+          type="text"
+          placeholder="192.168.1.10:8080"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+
+        <label for="setup-store">Loja</label>
+        <input
+          id="setup-store"
+          type="text"
+          placeholder="710"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+
+        <label for="setup-name">Nome da tela <span class="optional">(opcional)</span></label>
+        <input
+          id="setup-name"
+          type="text"
+          placeholder="pc-entrada-01"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+
+        <p class="error" id="setup-error" hidden></p>
+
+        <div class="actions">
+          <button type="submit" id="setup-save">Salvar</button>
+          <button type="button" id="setup-cancel" hidden>Cancelar</button>
+        </div>
+
+        <p class="device-id">ID do dispositivo: <span id="setup-device-id"></span></p>
+      </form>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
