@@ -39,7 +39,6 @@ pub struct ConfigView {
     pub device_name: Option<String>,
     pub store_id: Option<String>,
     pub server: Option<String>,
-    pub kiosk: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -124,7 +123,6 @@ impl AppState {
             device_name: config.device_name,
             store_id: config.store_id,
             server: config.server,
-            kiosk: config.kiosk,
         }
     }
 
@@ -188,7 +186,6 @@ pub fn apply_cli_provisioning(app: &AppHandle, provisioning: &Provisioning) {
         provisioning.server.as_deref(),
         provisioning.name.as_deref(),
         provisioning.store.as_deref(),
-        provisioning.kiosk,
     ) {
         Ok(false) => linfo!("Command-line provisioning matched what was already stored"),
         Ok(true) => {
@@ -212,10 +209,7 @@ pub fn apply_cli_provisioning(app: &AppHandle, provisioning: &Provisioning) {
 /// this must go through the same path as every other provisioning change.
 pub fn apply_remote_configure(app: &AppHandle, store_id: Option<&str>, device_name: Option<&str>) {
     let state = app.state::<AppState>();
-    match state
-        .config
-        .set_provisioning(None, device_name, store_id, None)
-    {
+    match state.config.set_provisioning(None, device_name, store_id) {
         Ok(false) => linfo!("Configure matched what was already stored"),
         Ok(true) => {
             linfo!("Re-provisioned by the dashboard");
@@ -310,7 +304,6 @@ pub fn save_provisioning(
     server: String,
     store_id: String,
     device_name: String,
-    kiosk: bool,
 ) -> Result<ConfigView, String> {
     let server = server.trim();
     let store_id = store_id.trim();
@@ -328,7 +321,6 @@ pub fn save_provisioning(
                 Some(device_name)
             },
             Some(store_id),
-            Some(kiosk),
         )
         .map_err(|err| format!("Não foi possível salvar: {err}"))?;
 

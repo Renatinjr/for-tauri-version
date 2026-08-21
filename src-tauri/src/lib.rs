@@ -2,9 +2,9 @@ pub mod app;
 pub mod cli;
 pub mod config;
 pub mod download;
-pub mod kiosk;
 pub mod logs;
 pub mod media_server;
+pub mod power;
 pub mod protocol;
 pub mod service;
 pub mod store;
@@ -52,25 +52,13 @@ pub fn run() {
             app::ui_log,
             app::request_quit,
         ])
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                // Closing is allowed by default. Refusing it only makes sense on a screen
-                // hanging in a shop, and there it is a setting rather than a law of the
-                // program — an app you cannot close is an app you cannot work on.
-                //
-                // Deliberately not exempting SIGNAGE_WINDOWED: dev is closable because
-                // kiosk defaults off, and an exemption would make the one branch that
-                // matters impossible to try out before it reaches a shop.
-                let kiosk = window
-                    .app_handle()
-                    .try_state::<AppState>()
-                    .is_some_and(|state| state.config.snapshot().kiosk);
-                if kiosk {
-                    api.prevent_close();
-                    lwarn!("Close refused: kiosk mode is on (Ctrl+Shift+Q still exits)");
-                } else {
-                    linfo!("Closing");
-                }
+        .on_window_event(|_window, event| {
+            if let WindowEvent::CloseRequested { .. } = event {
+                // Always honoured. An app you cannot close is an app nobody can work on,
+                // and a screen that needs to survive a curious customer is better served
+                // by the OS — Assigned Access or a Task Scheduler restart — than by a
+                // program refusing to obey the person standing in front of it.
+                linfo!("Closing");
             }
         })
         .setup(|tauri_app| {
@@ -98,11 +86,11 @@ pub fn run() {
             // through the single-instance plugin above.
             app::apply_cli_provisioning(&handle, &cli::parse(std::env::args().skip(1)));
 
-            kiosk::keep_awake();
+            power::keep_awake();
 
-            // Developing against a kiosk window means it eats your screen and refuses to
-            // close. `SIGNAGE_WINDOWED=1 pnpm tauri dev` gives back a normal window; the
-            // shipped app never sets it.
+            // A fullscreen always-on-top window eats the whole screen, which is right
+            // in a shop and unhelpful at a desk. `SIGNAGE_WINDOWED=1 pnpm tauri dev`
+            // gives back a normal window; the shipped app never sets it.
             let windowed = std::env::var_os("SIGNAGE_WINDOWED").is_some();
             if windowed {
                 if let Some(window) = tauri_app.get_webview_window("main") {

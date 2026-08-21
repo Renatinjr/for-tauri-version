@@ -1,18 +1,9 @@
-//! The desktop stand-ins for Android's device-owner machinery.
+//! Keeping the display on.
 //!
-//! The Android player relied on lock task mode, a HOME intent filter and
-//! `FLAG_KEEP_SCREEN_ON`. None of those exist here. What replaces them:
-//!
-//! | Android | here |
-//! |---|---|
-//! | lock task mode | a borderless, always-on-top fullscreen window whose close request is refused |
-//! | HOME intent filter | `tauri-plugin-autostart`, which writes the `Run` key |
-//! | `FLAG_KEEP_SCREEN_ON` | [`keep_awake`] |
-//! | `adb` as the escape hatch | Ctrl+Shift+Q held for three seconds |
-//!
-//! A true equivalent of device owner — Shell Launcher or Assigned Access, where the app
-//! replaces Explorer — needs Windows Enterprise and an IT policy. It is documented in the
-//! README as the optional extra step, not attempted here.
+//! The desktop stand-in for Android's `FLAG_KEEP_SCREEN_ON`. The rest of that player's
+//! device-owner machinery has no equivalent here and none is attempted: the window is
+//! fullscreen and always-on-top, but it closes when asked. Locking a machine down to one
+//! app is the OS's job — Assigned Access on Windows Enterprise — not this program's.
 
 /// Stops Windows blanking the display or sleeping the machine.
 ///

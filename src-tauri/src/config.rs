@@ -26,12 +26,6 @@ pub struct Config {
     pub store_id: Option<String>,
     /// Bare `host:port` or a full URL. The control URL is derived, never stored.
     pub server: Option<String>,
-    /// Refuse the window's close request, so a customer cannot end a campaign with Alt+F4.
-    ///
-    /// Off by default: an app that cannot be closed is an app nobody can work on, and the
-    /// screens that need this are the ones already hanging on a wall. Turn it on when a
-    /// machine goes into a shop. Ctrl+Shift+Q still exits either way.
-    pub kiosk: bool,
     pub current_video_id: Option<String>,
     /// None means the screen is standalone.
     pub group_id: Option<String>,
@@ -122,7 +116,6 @@ impl ConfigStore {
         server: Option<&str>,
         device_name: Option<&str>,
         store_id: Option<&str>,
-        kiosk: Option<bool>,
     ) -> std::io::Result<bool> {
         let changed = {
             let mut config = self.lock();
@@ -135,9 +128,6 @@ impl ConfigStore {
             }
             if let Some(value) = store_id {
                 config.store_id = Some(value.to_string());
-            }
-            if let Some(value) = kiosk {
-                config.kiosk = value;
             }
             *config != before
         };
@@ -264,23 +254,15 @@ mod tests {
         let store = ConfigStore::load(&dir).unwrap();
 
         store
-            .set_provisioning(
-                Some("10.0.0.4:8080"),
-                Some("tv-entrada-01"),
-                Some("710"),
-                Some(true),
-            )
+            .set_provisioning(Some("10.0.0.4:8080"), Some("tv-entrada-01"), Some("710"))
             .unwrap();
-        // Only the store moves; the name, server and kiosk flag must survive.
-        store
-            .set_provisioning(None, None, Some("704"), None)
-            .unwrap();
+        // Only the store moves; the name and the server must survive.
+        store.set_provisioning(None, None, Some("704")).unwrap();
 
         let config = store.snapshot();
         assert_eq!(config.server.as_deref(), Some("10.0.0.4:8080"));
         assert_eq!(config.device_name.as_deref(), Some("tv-entrada-01"));
         assert_eq!(config.store_id.as_deref(), Some("704"));
-        assert!(config.kiosk);
 
         store
             .set_current_video(Some("v1"), Some("entrada"), Some(42))
@@ -305,28 +287,6 @@ mod tests {
         assert!(first.starts_with("pc-"), "got {first}");
         assert_eq!(first.len(), 13);
         assert_eq!(first, second, "the id must not change on restart");
-
-        fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn a_screen_is_closable_until_somebody_says_otherwise() {
-        let dir = std::env::temp_dir().join(format!("signage-cfg-{}", uuid::Uuid::new_v4()));
-        fs::create_dir_all(&dir).unwrap();
-
-        assert!(
-            !ConfigStore::load(&dir).unwrap().snapshot().kiosk,
-            "a fresh screen must be closable"
-        );
-
-        ConfigStore::load(&dir)
-            .unwrap()
-            .set_provisioning(None, None, None, Some(true))
-            .unwrap();
-        assert!(
-            ConfigStore::load(&dir).unwrap().snapshot().kiosk,
-            "and the choice must survive a restart"
-        );
 
         fs::remove_dir_all(&dir).ok();
     }

@@ -45,7 +45,9 @@
           spellcheck="false"
         />
 
-        <label for="setup-name">Nome da tela <span class="optional">(opcional)</span></label>
+        <label for="setup-name"
+          >Nome da tela <span class="optional">(opcional)</span></label
+        >
         <input
           id="setup-name"
           type="text"
@@ -54,14 +56,6 @@
           autocapitalize="off"
           spellcheck="false"
         />
-
-        <label class="checkbox" for="setup-kiosk">
-          <input id="setup-kiosk" type="checkbox" />
-          <span>
-            Modo quiosque
-            <small>Impede que a tela seja fechada. Ctrl+Shift+Q ainda encerra.</small>
-          </span>
-        </label>
 
         <p class="error" id="setup-error" hidden></p>
 
@@ -72,7 +66,9 @@
           <button type="button" id="setup-quit" class="quiet">Sair</button>
         </div>
 
-        <p class="device-id">ID do dispositivo: <span id="setup-device-id"></span></p>
+        <p class="device-id">
+          ID do dispositivo: <span id="setup-device-id"></span>
+        </p>
       </form>
     </div>
 

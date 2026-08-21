@@ -1,9 +1,9 @@
 /**
  * The provisioning screen — a port of `setup/SetupActivity.kt`.
  *
- * Server, store, screen name, and whether the screen may be closed. It opens on every
- * launch, prefilled from the last session, so whoever is standing at the machine can see
- * and change where it points without knowing a shortcut. Ctrl+Shift+S opens it again later.
+ * Server, store and screen name. It opens on every launch, prefilled from the last
+ * session, so whoever is standing at the machine can see and change where it points
+ * without knowing a shortcut. Ctrl+Shift+S opens it again later.
  *
  * When there is something to fall back to it counts itself down and continues — a screen
  * coming back from a power cut at 04:00 must not sit here waiting for a human. Any key or
@@ -20,7 +20,6 @@ export interface ConfigView {
   deviceName: string | null;
   storeId: string | null;
   server: string | null;
-  kiosk: boolean;
 }
 
 export interface ShowOptions {
@@ -42,7 +41,6 @@ export class SetupScreen {
   private readonly server = document.querySelector<HTMLInputElement>("#setup-server")!;
   private readonly store = document.querySelector<HTMLInputElement>("#setup-store")!;
   private readonly name = document.querySelector<HTMLInputElement>("#setup-name")!;
-  private readonly kiosk = document.querySelector<HTMLInputElement>("#setup-kiosk")!;
   private readonly error = document.querySelector<HTMLParagraphElement>("#setup-error")!;
   private readonly cancel = document.querySelector<HTMLButtonElement>("#setup-cancel")!;
   private readonly save = document.querySelector<HTMLButtonElement>("#setup-save")!;
@@ -64,8 +62,8 @@ export class SetupScreen {
       void this.submit();
     });
     this.cancel.addEventListener("click", () => this.continue());
-    // The only visible way out: the window is borderless, so it has no close button, and
-    // Ctrl+Shift+Q is not something anybody discovers by looking.
+    // The window is borderless, so it has no close button; this and Ctrl+Shift+Q are
+    // the ways out, and only one of them is discoverable by looking.
     this.quit.addEventListener("click", () => {
       this.log("i", "Quit from the setup screen");
       void invoke("request_quit").catch(() => undefined);
@@ -102,7 +100,6 @@ export class SetupScreen {
     this.server.value = config.server ?? "";
     this.store.value = config.storeId ?? "";
     this.name.value = config.deviceName ?? "";
-    this.kiosk.checked = config.kiosk;
     this.deviceId.textContent = config.deviceId;
 
     this.root.hidden = false;
@@ -182,7 +179,6 @@ export class SetupScreen {
         server: this.server.value,
         storeId: this.store.value,
         deviceName: this.name.value,
-        kiosk: this.kiosk.checked,
       });
       this.hide();
       this.onSaved(config);

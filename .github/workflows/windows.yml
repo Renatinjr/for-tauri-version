@@ -5,7 +5,7 @@
 # workflow is the only place the shipped binary is ever produced.
 #
 # It is also where the Windows-only code is tested for the first time: path handling in
-# `store.rs`, and the `SetThreadExecutionState` call in `kiosk.rs`, which is compiled out
+# `store.rs`, and the `SetThreadExecutionState` call in `power.rs`, which is compiled out
 # entirely on the development machine.
 #
 #   push / pull request   -> test only

@@ -242,35 +242,6 @@ body.setup-open {
   color: var(--dim);
 }
 
-#setup .checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.7rem;
-  margin-top: 1.4rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-#setup .checkbox input {
-  width: 1.15rem;
-  height: 1.15rem;
-  margin-top: 0.15rem;
-  accent-color: #ffffff;
-  flex: none;
-}
-
-#setup .checkbox small {
-  display: block;
-  color: var(--muted);
-  font-size: 0.85rem;
-  margin-top: 0.2rem;
-  line-height: 1.45;
-}
-
 #setup .error {
   margin-top: 1rem;
   padding: 0.75rem 0.95rem;

@@ -20,7 +20,7 @@ a video wall in step, plus the nightly restart.
 
 | Phase | Contents | State |
 |---|---|---|
-| A | kiosk shell, media store, loopback media server, looping playback + watchdog | **done** |
+| A | fullscreen shell, media store, loopback media server, looping playback + watchdog | **done** |
 | B | `config.json`, setup screen, CLI provisioning | **done** |
 | C | control channel, `assign`, resumable download + SHA-256, remote commands | **done** |
 | D | time sync, group drift correction, nightly restart | not started |
@@ -67,13 +67,15 @@ indefinitely — that case is still derived from state, recomputed whenever eith
 never latched. (The Android player latched it once at boot and threw the setup form over a
 playing video on every activity recreation. Do not reintroduce that.)
 
-The form also carries the **kiosk** switch and the only visible way to quit — the window is
-borderless, so it has no close button of its own.
+The form also carries the only visible way to quit — the window is borderless, so it has
+no close button of its own. The window itself always honours a close request; locking a
+machine down to one app is left to Windows (Assigned Access), not enforced from inside the
+program.
 
 **The command line**, which is the equivalent of `adb shell am start -S --es …`:
 
 ```bash
-K-player.exe --server 192.168.1.10:8080 --store 710 --name pc-entrada-01 --kiosk
+K-player.exe --server 192.168.1.10:8080 --store 710 --name pc-entrada-01
 ```
 
 Run against a screen that is already running, this re-provisions it in place:
@@ -81,9 +83,6 @@ Run against a screen that is already running, this re-provisions it in place:
 process exits without opening a window. Omitted flags mean *leave alone*, so
 `--store 704` on its own moves the store and keeps the server and name — the same
 convention as `Prefs.setProvisioning`.
-
-`--kiosk` / `--no-kiosk` is the same switch as the checkbox on the form, so a machine can be
-locked down on its way into a shop without anybody hunting for it.
 
 The two paths differ in one way, on purpose: the form requires a server and a store,
 because a screen without a store can only ever be addressed individually and that defeats
@@ -190,9 +189,9 @@ across rather than reinvented.
 | `data/Prefs.kt` | `src-tauri/src/config.rs` |
 | `setup/SetupActivity.kt` | `src/setup.ts` + `src-tauri/src/cli.rs` |
 | `PlayerService.kt` | `src-tauri/src/app.rs` (+ `socket.rs`, `download.rs` in Phase C) |
-| lock task mode / device owner | fullscreen always-on-top window; close refused **only when kiosk mode is on**, which is off by default |
+| lock task mode / device owner | fullscreen always-on-top window, but closable — no equivalent, and none attempted |
 | HOME intent filter | `tauri-plugin-autostart` |
-| `FLAG_KEEP_SCREEN_ON` | `SetThreadExecutionState`, `src-tauri/src/kiosk.rs` |
+| `FLAG_KEEP_SCREEN_ON` | `SetThreadExecutionState`, `src-tauri/src/power.rs` |
 | `adb shell am start -S --es …` | a second launch, forwarded by `tauri-plugin-single-instance` |
 | `adb` as the escape hatch | Ctrl+Shift+Q held for three seconds |
 
@@ -230,7 +229,6 @@ On macOS, against a real 10-second campaign video:
   when corrupt.
 - The setup screen opens on every launch, prefilled, counts down, and continues on its own
   after ten seconds into playback.
-- `--kiosk` and `--no-kiosk` toggle the lock on a running screen and the choice persists.
 
 Against the real NestJS server, over an `https://` ngrok tunnel — so `wss://` and TLS were
 exercised, not just plain `ws://` on a LAN:
@@ -250,11 +248,11 @@ exercised, not just plain `ws://` on a LAN:
 Everything Windows-specific, because it cannot be exercised from a Mac and Tauri cannot
 cross-compile to Windows. The CI workflow exists now but has never run — the repository has
 no remote — so this list is still entirely open, starting with whether the Windows-only
-branch of `kiosk.rs` compiles at all:
+branch of `power.rs` compiles at all:
 
 - `SetThreadExecutionState` actually holding the display awake over 30+ minutes
 - autostart at logon, and the app surviving a reboot
-- Alt+F4 and the window chrome being refused
+- Alt+F4 and the taskbar closing the window cleanly rather than leaving it half-torn-down
 - the file-locking handshake, which on macOS is hidden by Unix rename semantics
 - WebView2 absent on a fresh Windows image
 - audible autoplay under `--autoplay-policy=no-user-gesture-required` (on macOS the player
@@ -274,6 +272,5 @@ test:
 
 - The setup screen's **appearance** — layout, contrast, focus order. Only its behaviour has
   been exercised: that it opens, counts down, validates, saves and closes when it should.
-- **Closing.** That the window honours a close request with kiosk off, refuses it with
-  kiosk on, and that the "Sair" button quits. The flag itself is unit-tested and the branch
-  is eight lines, but nothing has actually pressed the button.
+- **Closing.** That the window honours a close request and that the "Sair" button quits.
+  Nothing has actually pressed either.
