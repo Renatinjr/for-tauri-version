@@ -1,6 +1,6 @@
 [package]
 name = "signage-desktop"
-version = "0.2.0"
+version = "0.2.1"
 description = "Windows digital-signage player for the Katuxa store fleet"
 edition = "2021"
 rust-version = "1.82"
