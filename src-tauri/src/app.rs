@@ -294,7 +294,9 @@ pub fn validate_provisioning(server: &str, store_id: &str) -> Result<(), String>
         return Err("Informe o endereço do servidor.".into());
     }
     if store_id.is_empty() {
-        return Err("Informe o código da loja — as campanhas são enviadas por loja.".into());
+        return Err(
+            "Informe o identificador da tela — as campanhas são enviadas por identificador.".into(),
+        );
     }
     Ok(())
 }
@@ -407,13 +409,13 @@ mod tests {
 
     #[test]
     fn the_server_is_required() {
-        assert!(validate_provisioning("", "710").is_err());
-        assert!(validate_provisioning("192.168.1.10:8080", "710").is_ok());
+        assert!(validate_provisioning("", "003_ktx_esportivo").is_err());
+        assert!(validate_provisioning("192.168.1.10:8080", "003_ktx_esportivo").is_ok());
     }
 
     #[test]
     fn the_store_is_required_because_campaigns_are_sent_per_store() {
         let err = validate_provisioning("192.168.1.10:8080", "").unwrap_err();
-        assert!(err.contains("loja"), "got {err}");
+        assert!(err.contains("identificador"), "got {err}");
     }
 }

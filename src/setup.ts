@@ -48,7 +48,7 @@ export interface ShowOptions {
 }
 
 const FORCED_HINT =
-  "Esta tela ainda não sabe a qual servidor e loja pertence. Informe o endereço do servidor e o código da loja.";
+  "Esta tela ainda não sabe a qual servidor e loja pertence. Informe o endereço do servidor e o identificador.";
 const OPTIONAL_HINT =
   "Confira para onde esta tela aponta. Alterar estes dados reconecta a tela e carrega a campanha da nova loja.";
 
