@@ -294,7 +294,7 @@ pub fn validate_provisioning(server: &str, store_id: &str) -> Result<(), String>
         return Err("Informe o endereço do servidor.".into());
     }
     if store_id.is_empty() {
-        return Err("Informe o número da loja — as campanhas são enviadas por loja.".into());
+        return Err("Informe o código da loja — as campanhas são enviadas por loja.".into());
     }
     Ok(())
 }
