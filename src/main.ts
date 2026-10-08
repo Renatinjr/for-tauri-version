@@ -9,7 +9,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Player, type LogLevel } from "./player";
-import { SetupScreen, type ConfigView } from "./setup";
+import { SetupScreen, applyRotation, type ConfigView } from "./setup";
 
 interface MediaRef {
   videoId: string;
@@ -52,9 +52,17 @@ const player = new Player(video, freeze, log);
 /** Whether anything has been handed to the player yet this session. */
 let started = false;
 
+/** Every bootstrap carries the config, so the rotation is applied wherever one is read. */
+async function bootstrap(): Promise<Bootstrap> {
+  const state = await invoke<Bootstrap>("bootstrap");
+  applyRotation(state.config.rotation);
+  return state;
+}
+
 const setup = new SetupScreen(
   log,
   (saved) => {
+    applyRotation(saved.rotation);
     log("i", `Provisioned: store ${saved.storeId ?? "none"} at ${saved.server ?? "none"}`);
     // Phase C reconnects the control socket here. Until then, saving is all there is to do.
     void proceed();
@@ -109,7 +117,7 @@ function play(media: MediaRef): void {
 
 /** Past the setup screen: play what there is, or say why there is nothing. */
 async function proceed(): Promise<void> {
-  const state = await invoke<Bootstrap>("bootstrap");
+  const state = await bootstrap();
 
   if (state.needsProvisioning) {
     log("i", "Still unprovisioned and nothing to play — back to setup");
@@ -129,7 +137,7 @@ async function proceed(): Promise<void> {
 
 /** Opens the setup screen deliberately, prefilled with whatever is stored. */
 async function openSetup(): Promise<void> {
-  const state = await invoke<Bootstrap>("bootstrap");
+  const state = await bootstrap();
   setup.show(state.config, {
     cancellable: !state.needsProvisioning,
     // No countdown when a human asked for the form — they are already standing there.
@@ -155,6 +163,7 @@ async function main(): Promise<void> {
   });
 
   await listen<ConfigChanged>("config-changed", (event) => {
+    applyRotation(event.payload.config.rotation);
     setup.refresh(event.payload.config, event.payload.needsProvisioning);
   });
 
@@ -175,7 +184,7 @@ async function main(): Promise<void> {
   // is standing at the machine can see and change where it points without knowing a
   // shortcut. When there is something to fall back to it continues on its own after a few
   // seconds — a screen recovering from a power cut cannot wait for a human.
-  const state = await invoke<Bootstrap>("bootstrap");
+  const state = await bootstrap();
   log(
     "i",
     state.needsProvisioning

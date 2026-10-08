@@ -64,6 +64,29 @@ body {
   z-index: 1;
 }
 
+/* ----------------------------------------------------------------- rotation ---
+   A monitor hung on its side behind a PC that still outputs landscape. Each full-screen
+   layer swaps its width and height and turns about the centre, so a portrait video fills
+   the panel upright. The form and overlays turn too: the person reading them is standing
+   in front of a vertical screen. */
+
+:root:is([data-rotation="90"], [data-rotation="270"])
+  :is(#video, #freeze, #notice, #identify, #setup) {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: 100vh;
+  height: 100vw;
+}
+
+:root[data-rotation="90"] :is(#video, #freeze, #notice, #identify, #setup) {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+:root[data-rotation="270"] :is(#video, #freeze, #notice, #identify, #setup) {
+  transform: translate(-50%, -50%) rotate(270deg);
+}
+
 #video {
   z-index: 2;
 }
@@ -162,7 +185,9 @@ body.setup-open {
   inset: 0;
   z-index: 20;
   display: flex;
-  align-items: center;
+  /* "safe": when the form is taller than the screen (a 720p panel, or a vertical one
+     turned sideways), plain centring pushes its top out of reach of the scrollbar. */
+  align-items: safe center;
   justify-content: center;
   /* Semi-transparent rather than solid: a screen that is already playing keeps its video
      behind the form, blurred. */
@@ -240,6 +265,50 @@ body.setup-open {
 
 #setup input::placeholder {
   color: var(--dim);
+}
+
+#setup .toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.4rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+#setup label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+#setup label.check.sub {
+  padding-left: 1.9rem;
+  font-size: 1rem;
+}
+
+#setup label.check:has(input:disabled) {
+  color: var(--dim);
+  cursor: default;
+}
+
+#setup input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--text);
+  cursor: inherit;
+}
+
+#setup .toggle-hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 #setup .error {

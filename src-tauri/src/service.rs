@@ -267,21 +267,41 @@ async fn send(
     Ok(())
 }
 
+/// The size of the monitor the player is on, as the OS has it set — so a display turned to
+/// portrait in Windows settings reports 1080x1920. Falls back to the window, and to
+/// nothing when there is no window yet; the server then judges by the rotation alone.
+///
+/// Read on every heartbeat, so a display re-oriented while running reaches the server, and
+/// with it the matching campaign, within one heartbeat.
+fn display_size(app: &AppHandle) -> Option<(u32, u32)> {
+    let window = app.get_webview_window("main")?;
+    let size = match window.current_monitor() {
+        Ok(Some(monitor)) => *monitor.size(),
+        _ => window.inner_size().ok()?,
+    };
+    (size.width > 0 && size.height > 0).then_some((size.width, size.height))
+}
+
 fn hello(app: &AppHandle) -> PlayerMessage {
     let state = app.state::<AppState>();
     let config = state.config.snapshot();
+    let display = display_size(app);
     PlayerMessage::Hello {
         device_id: config.device_id,
         store_id: config.store_id,
         device_name: config.device_name,
         app_version: app_version(),
         current_video_id: state.active_video_id(),
+        rotation: config.rotation,
+        display_width: display.map(|(w, _)| w),
+        display_height: display.map(|(_, h)| h),
     }
 }
 
 fn heartbeat_message(app: &AppHandle) -> PlayerMessage {
     let state = app.state::<AppState>();
     let config = state.config.snapshot();
+    let display = display_size(app);
     let playback = state.playback();
     PlayerMessage::Heartbeat {
         device_id: config.device_id,
@@ -292,6 +312,9 @@ fn heartbeat_message(app: &AppHandle) -> PlayerMessage {
         free_bytes: state.store.free_bytes(),
         app_version: app_version(),
         uptime_ms: state.uptime_ms(),
+        rotation: config.rotation,
+        display_width: display.map(|(w, _)| w),
+        display_height: display.map(|(_, h)| h),
     }
 }
 

@@ -75,6 +75,14 @@ pub enum PlayerMessage {
         app_version: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         current_video_id: Option<String>,
+        /// Clockwise turn of the picture: 0, 90 or 270. Always sent, as on Android.
+        rotation: u16,
+        /// The monitor's size as Windows reports it, before our own rotation. With the
+        /// rotation, this is how the server tells a portrait display from a landscape one.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display_width: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display_height: Option<u32>,
     },
     Heartbeat {
         device_id: String,
@@ -88,6 +96,11 @@ pub enum PlayerMessage {
         free_bytes: u64,
         app_version: String,
         uptime_ms: u64,
+        rotation: u16,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display_width: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display_height: Option<u32>,
     },
     DownloadProgress {
         video_id: String,
@@ -130,10 +143,13 @@ mod tests {
             device_name: None,
             app_version: "desktop-0.1.2".into(),
             current_video_id: None,
+            rotation: 0,
+            display_width: None,
+            display_height: None,
         };
         assert_eq!(
             serde_json::to_string(&hello).unwrap(),
-            r#"{"type":"hello","deviceId":"pc-abc123","appVersion":"desktop-0.1.2"}"#
+            r#"{"type":"hello","deviceId":"pc-abc123","appVersion":"desktop-0.1.2","rotation":0}"#
         );
     }
 
@@ -148,10 +164,31 @@ mod tests {
             free_bytes: 2_147_483_648,
             app_version: "desktop-0.1.2".into(),
             uptime_ms: 918_000,
+            rotation: 90,
+            display_width: None,
+            display_height: None,
         };
         assert_eq!(
             serde_json::to_string(&beat).unwrap(),
-            r#"{"type":"heartbeat","deviceId":"pc-abc123","storeId":"710","currentVideoId":"vid_2026_08_promo","playing":true,"positionMs":14300,"freeBytes":2147483648,"appVersion":"desktop-0.1.2","uptimeMs":918000}"#
+            r#"{"type":"heartbeat","deviceId":"pc-abc123","storeId":"710","currentVideoId":"vid_2026_08_promo","playing":true,"positionMs":14300,"freeBytes":2147483648,"appVersion":"desktop-0.1.2","uptimeMs":918000,"rotation":90}"#
+        );
+    }
+
+    #[test]
+    fn a_portrait_display_is_reported_with_its_size() {
+        let hello = PlayerMessage::Hello {
+            device_id: "pc-abc123".into(),
+            store_id: Some("710".into()),
+            device_name: None,
+            app_version: "desktop-0.1.2".into(),
+            current_video_id: None,
+            rotation: 0,
+            display_width: Some(1080),
+            display_height: Some(1920),
+        };
+        assert_eq!(
+            serde_json::to_string(&hello).unwrap(),
+            r#"{"type":"hello","deviceId":"pc-abc123","storeId":"710","appVersion":"desktop-0.1.2","rotation":0,"displayWidth":1080,"displayHeight":1920}"#
         );
     }
 
