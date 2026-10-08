@@ -20,6 +20,24 @@ export interface ConfigView {
   deviceName: string | null;
   storeId: string | null;
   server: string | null;
+  /** Clockwise turn of the picture: 0, 90 or 270. */
+  rotation: Rotation;
+}
+
+export type Rotation = 0 | 90 | 270;
+
+/**
+ * Turns the picture for a screen hung on its side. Everything over the video turns with
+ * it — notices, the identify overlay, this form — so it all reads upright to whoever is
+ * standing in front of the screen.
+ */
+/** The window is taller than wide: the OS is already outputting portrait. */
+function outputIsPortrait(): boolean {
+  return window.innerHeight > window.innerWidth;
+}
+
+export function applyRotation(rotation: Rotation): void {
+  document.documentElement.dataset.rotation = String(rotation);
 }
 
 export interface ShowOptions {
@@ -41,6 +59,14 @@ export class SetupScreen {
   private readonly server = document.querySelector<HTMLInputElement>("#setup-server")!;
   private readonly store = document.querySelector<HTMLInputElement>("#setup-store")!;
   private readonly name = document.querySelector<HTMLInputElement>("#setup-name")!;
+  private readonly vertical = document.querySelector<HTMLInputElement>("#setup-vertical")!;
+  private readonly flip = document.querySelector<HTMLInputElement>("#setup-flip")!;
+  private readonly verticalHint = document.querySelector<HTMLParagraphElement>(
+    "#setup-vertical-hint",
+  )!;
+  private readonly portraitHint = document.querySelector<HTMLParagraphElement>(
+    "#setup-portrait-hint",
+  )!;
   private readonly error = document.querySelector<HTMLParagraphElement>("#setup-error")!;
   private readonly cancel = document.querySelector<HTMLButtonElement>("#setup-cancel")!;
   private readonly save = document.querySelector<HTMLButtonElement>("#setup-save")!;
@@ -62,6 +88,7 @@ export class SetupScreen {
       void this.submit();
     });
     this.cancel.addEventListener("click", () => this.continue());
+    this.vertical.addEventListener("change", () => this.syncFlip());
     // The window is borderless, so it has no close button; this and Ctrl+Shift+Q are
     // the ways out, and only one of them is discoverable by looking.
     this.quit.addEventListener("click", () => {
@@ -100,6 +127,10 @@ export class SetupScreen {
     this.server.value = config.server ?? "";
     this.store.value = config.storeId ?? "";
     this.name.value = config.deviceName ?? "";
+    this.vertical.checked = config.rotation !== 0;
+    this.flip.checked = config.rotation === 270;
+    this.syncPortrait();
+    this.syncFlip();
     this.deviceId.textContent = config.deviceId;
 
     this.root.hidden = false;
@@ -179,6 +210,7 @@ export class SetupScreen {
         server: this.server.value,
         storeId: this.store.value,
         deviceName: this.name.value,
+        rotation: this.rotation(),
       });
       this.hide();
       this.onSaved(config);
@@ -188,6 +220,30 @@ export class SetupScreen {
     } finally {
       this.save.disabled = false;
     }
+  }
+
+  private rotation(): Rotation {
+    if (outputIsPortrait() || !this.vertical.checked) return 0;
+    return this.flip.checked ? 270 : 90;
+  }
+
+  /**
+   * Windows set to portrait already gives us a tall window. Turning the picture as well
+   * would put it on its side, so the choice is taken away and the reason shown instead.
+   * The server still knows the screen is vertical: it gets the monitor's size.
+   */
+  private syncPortrait(): void {
+    const portrait = outputIsPortrait();
+    this.vertical.disabled = portrait;
+    if (portrait) this.vertical.checked = false;
+    this.verticalHint.hidden = portrait;
+    this.portraitHint.hidden = !portrait;
+  }
+
+  /** "The other way round" only means something for a vertical screen. */
+  private syncFlip(): void {
+    this.flip.disabled = !this.vertical.checked;
+    if (!this.vertical.checked) this.flip.checked = false;
   }
 
   private showError(message: string | null): void {

@@ -32,7 +32,14 @@ pub struct Config {
     /// Persisted on purpose: `(now - origin) % duration` stays valid indefinitely, so a
     /// screen rejoins its group after a restart instead of drifting until the next assign.
     pub sync_origin_ms: Option<i64>,
+    /// How far the picture is turned clockwise, for a screen hung on its side while the PC
+    /// still outputs landscape: 0, 90 or 270. Set from the setup screen and reported in
+    /// every hello and heartbeat, so the server knows which screens are vertical.
+    pub rotation: u16,
 }
+
+/// The turns a screen can be mounted at. Anything else in the file is treated as 0.
+pub const ROTATIONS: [u16; 3] = [0, 90, 270];
 
 impl Config {
     /// Where the control socket should connect.
@@ -87,6 +94,14 @@ impl ConfigStore {
             Err(_) => Config::default(),
         };
 
+        if !ROTATIONS.contains(&config.rotation) {
+            crate::logs::write(
+                'W',
+                &format!("config.json has rotation {} — using 0", config.rotation),
+            );
+            config.rotation = 0;
+        }
+
         if config.device_id.is_empty() {
             // `pc-` rather than the Android player's `tv-`, so the two are distinguishable
             // in the dashboard without a server change.
@@ -130,6 +145,27 @@ impl ConfigStore {
                 config.store_id = Some(value.to_string());
             }
             *config != before
+        };
+        if changed {
+            self.persist()?;
+        }
+        Ok(changed)
+    }
+
+    /// Sets the screen rotation. Returns true when it changed; a value outside
+    /// [`ROTATIONS`] is refused rather than stored.
+    pub fn set_rotation(&self, rotation: u16) -> std::io::Result<bool> {
+        if !ROTATIONS.contains(&rotation) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("rotation must be 0, 90 or 270, not {rotation}"),
+            ));
+        }
+        let changed = {
+            let mut config = self.lock();
+            let changed = config.rotation != rotation;
+            config.rotation = rotation;
+            changed
         };
         if changed {
             self.persist()?;
@@ -272,6 +308,34 @@ mod tests {
         assert_eq!(config.current_video_id, None);
         assert_eq!(config.group_id, None);
         assert_eq!(config.sync_origin_ms, None);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn rotation_survives_a_restart_and_rejects_what_a_screen_cannot_do() {
+        let dir = std::env::temp_dir().join(format!("signage-cfg-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+
+        let store = ConfigStore::load(&dir).unwrap();
+        assert_eq!(
+            store.snapshot().rotation,
+            0,
+            "landscape until told otherwise"
+        );
+        assert!(store.set_rotation(270).unwrap());
+        assert!(
+            !store.set_rotation(270).unwrap(),
+            "no change, no re-announce"
+        );
+        assert!(store.set_rotation(45).is_err());
+        assert_eq!(ConfigStore::load(&dir).unwrap().snapshot().rotation, 270);
+
+        // A hand-edited file with a nonsense value boots as landscape instead of failing.
+        let path = dir.join("config.json");
+        let text = fs::read_to_string(&path).unwrap().replace("270", "45");
+        fs::write(&path, text).unwrap();
+        assert_eq!(ConfigStore::load(&dir).unwrap().snapshot().rotation, 0);
 
         fs::remove_dir_all(&dir).ok();
     }

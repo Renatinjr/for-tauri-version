@@ -57,6 +57,27 @@
           spellcheck="false"
         />
 
+        <!-- For a monitor hung on its side while the PC still outputs landscape. The
+             second box is for screens mounted the other way round. -->
+        <div class="toggle">
+          <label class="check">
+            <input id="setup-vertical" type="checkbox" />
+            Tela vertical
+          </label>
+          <label class="check sub">
+            <input id="setup-flip" type="checkbox" />
+            Girada para o outro lado
+          </label>
+          <p class="toggle-hint" id="setup-vertical-hint">
+            Gira o vídeo 90° para monitores instalados em pé. Se a imagem ficar de
+            cabeça para baixo, marque “girada para o outro lado”.
+          </p>
+          <p class="toggle-hint" id="setup-portrait-hint" hidden>
+            O Windows já está em modo retrato, então o vídeo não precisa ser girado. Esta
+            tela já é informada ao servidor como vertical e recebe a campanha vertical.
+          </p>
+        </div>
+
         <p class="error" id="setup-error" hidden></p>
 
         <div class="actions">

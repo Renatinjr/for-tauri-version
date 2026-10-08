@@ -39,6 +39,8 @@ pub struct ConfigView {
     pub device_name: Option<String>,
     pub store_id: Option<String>,
     pub server: Option<String>,
+    /// 0, 90 or 270 — the frontend turns the picture by this much.
+    pub rotation: u16,
 }
 
 #[derive(Debug, Serialize)]
@@ -123,6 +125,7 @@ impl AppState {
             device_name: config.device_name,
             store_id: config.store_id,
             server: config.server,
+            rotation: config.rotation,
         }
     }
 
@@ -304,6 +307,7 @@ pub fn save_provisioning(
     server: String,
     store_id: String,
     device_name: String,
+    rotation: u16,
 ) -> Result<ConfigView, String> {
     let server = server.trim();
     let store_id = store_id.trim();
@@ -323,14 +327,19 @@ pub fn save_provisioning(
             Some(store_id),
         )
         .map_err(|err| format!("Não foi possível salvar: {err}"))?;
+    let rotated = state
+        .config
+        .set_rotation(rotation)
+        .map_err(|err| format!("Não foi possível salvar: {err}"))?;
 
-    if changed {
+    if changed || rotated {
         let config = state.config.snapshot();
         linfo!(
-            "Provisioned from the setup screen: server={:?} store={:?} name={:?}",
+            "Provisioned from the setup screen: server={:?} store={:?} name={:?} rotation={}",
             config.server,
             config.store_id,
-            config.device_name
+            config.device_name,
+            config.rotation
         );
         announce_config(&app, &state);
     } else {
